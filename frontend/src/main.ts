@@ -4,8 +4,8 @@ import "./style.css";
 import demoData from "./data/demo.json";
 import type { DashboardPayload, SchoolSummary } from "./types";
 
-const REFRESH_MS = 30_000;
-const DATA_MODE = import.meta.env.VITE_DATA_MODE ?? "demo";
+const REFRESH_MS = 60_000;
+const DATA_MODE = import.meta.env.VITE_DATA_MODE ?? "api";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const COLORS = [
   "#A855F7", "#22D3EE", "#34D399", "#FB923C", "#FACC15", "#F472B6", "#60A5FA",
@@ -79,6 +79,7 @@ function demoPayload(): DashboardPayload {
 }
 
 async function fetchApi(): Promise<DashboardPayload> {
+  if (!API_BASE) throw new Error("El Worker de LimeSurvey todavía no está configurado");
   const response = await fetch(`${API_BASE}/api/dashboard`, { headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error(`Actualización interrumpida (HTTP ${response.status})`);
   return response.json() as Promise<DashboardPayload>;

@@ -22,7 +22,7 @@ jobs:
       - run: npm install
       - run: npm run build --workspace frontend
         env:
-          VITE_DATA_MODE: ${{ vars.VITE_DATA_MODE || 'demo' }}
+          VITE_DATA_MODE: ${{ vars.VITE_DATA_MODE || 'api' }}
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
           GITHUB_REPOSITORY: ${{ github.repository }}
       - uses: actions/configure-pages@v5

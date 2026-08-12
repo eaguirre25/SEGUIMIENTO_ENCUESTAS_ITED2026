@@ -18,7 +18,7 @@ El Worker abre una sesión, exporta respuestas completas e incompletas con `expo
 
 ```text
 frontend/
-  src/data/demo.json       Datos de desarrollo con el contrato real
+  src/data/demo.json       Contrato vacío para desarrollo sin datos ficticios
   src/main.ts              UI, actualización, tabla, recipiente y mapa
   src/style.css            Sistema visual responsive oscuro
   vite.config.ts           Desarrollo y base de GitHub Pages
@@ -44,7 +44,7 @@ No se recibieron una exportación CSV/JSON ni la estructura de preguntas, por lo
 
 El valor de cada propiedad debe ser exactamente el encabezado/QCode que aparece en la exportación. El Worker falla con un mensaje explícito mientras `SCHOOL` siga sin configurar. El ID inicial `977929` sí está en `worker/wrangler.jsonc` como variable no sensible y puede cambiarse allí.
 
-## Desarrollo rápido en modo demo
+## Desarrollo rápido sin datos reales
 
 Requiere Node.js 22 o superior.
 
@@ -54,7 +54,7 @@ copy frontend\.env.example frontend\.env.local
 npm run dev --workspace frontend
 ```
 
-En PowerShell, `Copy-Item frontend/.env.example frontend/.env.local` es equivalente. La configuración de ejemplo usa `VITE_DATA_MODE=demo`. Abrir `http://localhost:5173`.
+En PowerShell, `Copy-Item frontend/.env.example frontend/.env.local` es equivalente. La configuración usa `VITE_DATA_MODE=api`; mientras el Worker no esté ejecutándose muestra un estado explícito sin inventar respuestas. Abrir `http://localhost:5173`.
 
 ## Configurar Cloudflare desde cero
 
@@ -131,7 +131,7 @@ Wrangler muestra una URL similar a `https://limesurvey-dashboard-api.<subdominio
 
 1. Crear el repositorio y subir este proyecto.
 2. En GitHub, abrir **Settings → Pages → Source** y elegir **GitHub Actions**.
-3. La página se publica inicialmente en modo demo. Cuando el Worker esté listo, en **Settings → Secrets and variables → Actions → Variables** crear `VITE_DATA_MODE=api` y `VITE_API_BASE_URL` con la URL del Worker, sin `/api/dashboard`.
+3. La página se publica en modo API y permanece sin datos mientras el Worker no esté configurado. Cuando esté listo, en **Settings → Secrets and variables → Actions → Variables** crear `VITE_API_BASE_URL` con la URL del Worker, sin `/api/dashboard`.
 4. La configuración `env.production` ya permite el origen `https://eaguirre25.github.io`; solo hay que cambiarlo si se utiliza otro dominio.
 5. Cada push a `main` que afecte `frontend/` ejecuta `.github/workflows/deploy-pages.yml`.
 
