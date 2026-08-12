@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "limesurvey-dashboard-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "observability": { "enabled": true },
+  "vars": {
+    "LIMESURVEY_STUDENT_SURVEY_ID": "977929",
+    "DASHBOARD_ALLOWED_ORIGIN": "http://localhost:5173"
+  },
+  "env": {
+    "production": {
+      "name": "limesurvey-dashboard-api-production",
+      "vars": {
+        "LIMESURVEY_STUDENT_SURVEY_ID": "977929",
+        "DASHBOARD_ALLOWED_ORIGIN": "https://eaguirre25.github.io"
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "limesurvey-field-observatory",
+  "private": true,
+  "workspaces": ["frontend", "worker"],
+  "scripts": {
+    "build": "npm run build --workspace frontend && npm run build --workspace worker",
+    "typecheck": "npm run typecheck --workspace frontend && npm run typecheck --workspace worker",
+    "test": "npm run test --workspace worker"
+  }
+}
+
