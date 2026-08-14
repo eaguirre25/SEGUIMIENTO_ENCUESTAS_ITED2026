@@ -12,5 +12,6 @@ export const QUESTION_MAP = {
   LATITUDE: "Q996543[SQ002]",
   LONGITUDE: "Q996543[SQ003]",
   COMPLETION: "submitdate",
+  LOAD_TIMESTAMP: ["startdate", "datestamp", "submitdate"],
   MANAGEMENT_TYPE: "Q996591",
 } as const satisfies Record<string, string | readonly string[] | null>;

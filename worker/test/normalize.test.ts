@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDashboard, detectCompletion, normalizeSchool, parseCourseYear, parseSchoolNumber } from "../src/normalize";
+import { buildDashboard, detectCompletion, normalizeSchool, parseCourseYear, parseSchoolNumber, splitTimestamp } from "../src/normalize";
 import { decodeExport } from "../src/limesurvey";
 import { QUESTION_MAP } from "../src/question-map";
 import type { QuestionMap } from "../src/normalize";
@@ -12,6 +12,7 @@ const map: QuestionMap = {
   LONGITUDE: "lon",
   COMPLETION: "submitdate",
   MANAGEMENT_TYPE: null,
+  LOAD_TIMESTAMP: ["startdate", "submitdate"],
 };
 
 describe("normalización", () => {
@@ -88,6 +89,11 @@ describe("normalización", () => {
     expect(parseCourseYear("3.º año")).toBe(3);
     expect(parseCourseYear("8")).toBeNull();
   });
+
+  it("separa fecha y hora sin convertir la zona horaria de LimeSurvey", () => {
+    expect(splitTimestamp("2026-08-14 09:07:05")).toEqual({ date: "2026-08-14", time: "09:07:05" });
+    expect(splitTimestamp(null)).toEqual({ date: "", time: "" });
+  });
 });
 
 describe("agregación segura", () => {
@@ -135,6 +141,18 @@ describe("agregación segura", () => {
     for (const school of result.schools) {
       expect(school.complete + school.incomplete).toBe(school.total);
     }
+  });
+
+  it("expone una fila mínima de monitoreo por respuesta y ordena la más reciente primero", () => {
+    const monitored = buildDashboard([
+      { school: "EES 1", startdate: "2026-08-14 08:05:00", submitdate: null },
+      { school: "EES 2", startdate: "2026-08-14 09:15:30", submitdate: "2026-08-14 09:20:00" },
+    ], "977929", map);
+    expect(monitored.monitoringRows).toEqual([
+      { date: "2026-08-14", time: "09:15:30", school: "EES 2", complete: true },
+      { date: "2026-08-14", time: "08:05:00", school: "EES 1", complete: false },
+    ]);
+    expect(monitored.monitoringRows).toHaveLength(monitored.summary.total);
   });
 
   it("cuenta en el total las respuestas sin escuela y conserva su punto como no identificado", () => {

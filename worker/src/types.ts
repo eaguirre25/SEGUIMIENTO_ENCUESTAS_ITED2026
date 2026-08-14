@@ -56,6 +56,14 @@ export interface DashboardPayload {
     lat: number;
     lon: number;
   }>;
+  monitoringRows: LoadMonitoringRow[];
+}
+
+export interface LoadMonitoringRow {
+  date: string;
+  time: string;
+  school: string;
+  complete: boolean;
 }
 
 export type ManagementType = "state" | "private" | "unknown";

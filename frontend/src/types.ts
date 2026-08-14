@@ -28,4 +28,10 @@ export interface DashboardPayload {
     lat: number;
     lon: number;
   }>;
+  monitoringRows: Array<{
+    date: string;
+    time: string;
+    school: string;
+    complete: boolean;
+  }>;
 }

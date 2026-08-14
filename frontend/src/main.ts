@@ -17,6 +17,8 @@ const COLORS = [
 ];
 
 let data: DashboardPayload | null = null;
+let studentData: DashboardPayload | null = null;
+let activePopulation: Population = "students";
 let lastSuccessfulFetch = 0;
 let warning = "";
 let map: maplibregl.Map | null = null;
@@ -51,6 +53,14 @@ interface PrivateSchool {
 }
 
 type SchoolLocation = StateSchool | PrivateSchool;
+type Population = "students" | "teachers" | "families";
+type DashboardView = "tracking" | "map" | "monitoring";
+
+const POPULATION_LABELS: Record<Population, string> = {
+  students: "ESTUDIANTES",
+  teachers: "DOCENTES",
+  families: "FAMILIAS",
+};
 
 interface ResolvedMapPoint {
   schoolId: string;
@@ -92,12 +102,21 @@ if (!app) throw new Error("No se encontró #app");
 
 app.innerHTML = `
   <header class="topbar">
-    <div class="brand"><span class="brand-mark"></span><div><p>ITED 2026 · ENCUESTA A ESTUDIANTES</p><h1>Seguimiento del trabajo de campo</h1></div><img class="header-logo" src="${unsamLogoUrl}" alt="Logo UNSAM"></div>
+    <div class="brand"><span class="brand-mark"></span><div><p id="brand-survey-label">ITED 2026 · ENCUESTA A ESTUDIANTES</p><h1>Seguimiento del trabajo de campo</h1></div><img class="header-logo" src="${unsamLogoUrl}" alt="Logo UNSAM"></div>
     <div class="top-actions"><div class="sync"><span class="pulse"></span><span id="sync-label">Iniciando enlace…</span></div><button id="logout" class="logout hidden" type="button">Cerrar sesión</button></div>
   </header>
+  <section class="population-bar" aria-labelledby="population-title">
+    <span id="population-title">Resultados de</span>
+    <div class="population-switcher" role="group" aria-label="Población de la encuesta">
+      <button class="population-button active" data-population="students" type="button">Estudiantes <b id="students-count">0</b></button>
+      <button class="population-button" data-population="teachers" type="button">Docentes <b>0</b></button>
+      <button class="population-button" data-population="families" type="button">Familias <b>0</b></button>
+    </div>
+  </section>
   <nav class="tabs" aria-label="Vistas del panel">
     <button class="tab active" data-tab="tracking">Seguimiento</button>
     <button class="tab" data-tab="map">Mapa <span id="map-count" class="tab-count">0</span></button>
+    <button class="tab" data-tab="monitoring">Monitoreo de carga <span id="monitoring-count" class="tab-count">0</span></button>
   </nav>
   <main>
     <section id="tracking-view" class="view"><div id="warning-slot"></div><div class="loading">Conectando con la fuente de datos…</div></section>
@@ -111,6 +130,7 @@ app.innerHTML = `
         </div>
       </div>
     </section>
+    <section id="monitoring-view" class="view hidden"></section>
   </main>
   <div id="auth-overlay" class="auth-overlay hidden">
     <form id="login-form" class="login-card">
@@ -134,7 +154,10 @@ app.innerHTML = `
 `;
 
 app.querySelectorAll<HTMLButtonElement>(".tab").forEach((button) => {
-  button.addEventListener("click", () => switchTab(button.dataset.tab === "map" ? "map" : "tracking"));
+  button.addEventListener("click", () => switchTab((button.dataset.tab as DashboardView) ?? "tracking"));
+});
+app.querySelectorAll<HTMLButtonElement>(".population-button").forEach((button) => {
+  button.addEventListener("click", () => selectPopulation(button.dataset.population as Population));
 });
 document.querySelector<HTMLFormElement>("#login-form")?.addEventListener("submit", handleLogin);
 document.querySelector<HTMLButtonElement>("#logout")?.addEventListener("click", logout);
@@ -158,7 +181,8 @@ async function refresh(): Promise<void> {
   try {
     const fresh = DATA_MODE === "demo" ? demoPayload() : await fetchApi();
     validatePayload(fresh);
-    data = fresh;
+    studentData = fresh;
+    data = payloadForPopulation(activePopulation);
     lastSuccessfulFetch = Date.now();
     warning = "";
     hideLogin();
@@ -201,7 +225,8 @@ async function handleLogin(event: SubmitEvent): Promise<void> {
   try {
     const fresh = await fetchApi();
     validatePayload(fresh);
-    data = fresh;
+    studentData = fresh;
+    data = payloadForPopulation(activePopulation);
     lastSuccessfulFetch = Date.now();
     warning = "";
     if (remember) {
@@ -247,18 +272,51 @@ function hideLogin(): void {
 function logout(): void {
   authHeader = "";
   data = null;
+  studentData = null;
   sessionStorage.removeItem("dashboard-authorization");
   localStorage.removeItem("dashboard-authorization");
   showLogin();
 }
 
 function validatePayload(payload: DashboardPayload): void {
-  if (!payload?.summary || !Array.isArray(payload.schools) || !Array.isArray(payload.mapPoints)) {
+  if (!payload?.summary || !Array.isArray(payload.schools) || !Array.isArray(payload.mapPoints) || !Array.isArray(payload.monitoringRows)) {
     throw new Error("El endpoint devolvió un formato inesperado");
   }
   if (payload.summary.complete + payload.summary.incomplete !== payload.summary.total) {
     throw new Error("Los totales del endpoint son inconsistentes");
   }
+  if (payload.monitoringRows.length !== payload.summary.total) {
+    throw new Error("El monitoreo de carga no coincide con el total de respuestas");
+  }
+}
+
+function payloadForPopulation(population: Population): DashboardPayload | null {
+  if (population === "students") return studentData;
+  return {
+    generatedAt: studentData?.generatedAt ?? new Date().toISOString(),
+    surveyId: "",
+    summary: { total: 0, complete: 0, incomplete: 0, completePct: 0 },
+    schools: [],
+    mapPoints: [],
+    monitoringRows: [],
+  };
+}
+
+function selectPopulation(population: Population): void {
+  if (!POPULATION_LABELS[population] || activePopulation === population) return;
+  activePopulation = population;
+  data = payloadForPopulation(population);
+  filtersInitialized = false;
+  selectedSchoolIds.clear();
+  document.querySelectorAll<HTMLButtonElement>(".population-button").forEach((button) => {
+    const selected = button.dataset.population === population;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+  const brandLabel = document.querySelector<HTMLElement>("#brand-survey-label");
+  if (brandLabel) brandLabel.textContent = `ITED 2026 · ENCUESTA A ${POPULATION_LABELS[population]}`;
+  closeSchoolModal();
+  render();
 }
 
 function render(): void {
@@ -305,6 +363,10 @@ function render(): void {
     if (id) openSchoolModal(id);
   }));
   document.querySelector<HTMLElement>("#map-count")!.textContent = String(data.mapPoints.length);
+  document.querySelector<HTMLElement>("#monitoring-count")!.textContent = String(data.monitoringRows.length);
+  const studentsCount = document.querySelector<HTMLElement>("#students-count");
+  if (studentsCount) studentsCount.textContent = String(studentData?.summary.total ?? 0);
+  renderMonitoring();
   renderLegend();
   renderMapStatus();
   if (mapLoaded) updateMap();
@@ -372,10 +434,32 @@ function closeSchoolModal(): void {
   document.querySelector<HTMLDialogElement>("#school-modal")?.close();
 }
 
-function switchTab(tab: "tracking" | "map"): void {
+function renderMonitoring(): void {
+  const view = document.querySelector<HTMLElement>("#monitoring-view");
+  if (!view || !data) return;
+  const rows = data.monitoringRows;
+  view.innerHTML = `
+    <section class="monitoring-panel panel">
+      <div class="monitoring-heading section-heading">
+        <div><p class="eyebrow">REGISTRO DE RESPUESTAS</p><h2>Monitoreo de carga · ${POPULATION_LABELS[activePopulation].toLocaleLowerCase("es-AR")}</h2></div>
+        <span>${formatNumber(rows.length)} registros</span>
+      </div>
+      ${rows.length ? `<div class="monitoring-table-wrap"><table class="monitoring-table">
+        <thead><tr><th>Fecha</th><th>Hora</th><th>¿A qué escuela vas?</th><th>Encuesta completa</th></tr></thead>
+        <tbody>${rows.map((row) => `<tr>
+          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.school)}</td>
+          <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "SI" : "NO"}</span></td>
+        </tr>`).join("")}</tbody>
+      </table></div>` : `<div class="monitoring-empty"><strong>Sin cargas registradas</strong><p>Los resultados de ${POPULATION_LABELS[activePopulation].toLocaleLowerCase("es-AR")} se mostrarán aquí cuando la encuesta esté conectada.</p></div>`}
+    </section>`;
+}
+
+function switchTab(tab: DashboardView): void {
+  if (!(["tracking", "map", "monitoring"] as DashboardView[]).includes(tab)) tab = "tracking";
   document.querySelectorAll(".tab").forEach((element) => element.classList.toggle("active", (element as HTMLElement).dataset.tab === tab));
   document.querySelector("#tracking-view")?.classList.toggle("hidden", tab !== "tracking");
   document.querySelector("#map-view")?.classList.toggle("hidden", tab !== "map");
+  document.querySelector("#monitoring-view")?.classList.toggle("hidden", tab !== "monitoring");
   if (tab === "map") window.setTimeout(initMap, 0);
 }
 
@@ -696,4 +780,8 @@ function warningMarkup(): string {
 function formatNumber(value: number): string { return new Intl.NumberFormat("es-AR").format(value); }
 function formatPct(value: number): string { return `${new Intl.NumberFormat("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)} %`; }
 function formatTime(value: string): string { return new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }
+function formatDate(value: string): string {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : escapeHtml(value || "—");
+}
 function escapeHtml(value: string): string { return value.replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]!); }

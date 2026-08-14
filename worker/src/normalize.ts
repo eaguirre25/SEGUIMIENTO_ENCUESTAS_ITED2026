@@ -227,7 +227,25 @@ export function buildDashboard(
         lon,
       }];
     }),
+    monitoringRows: rawResponses.map((raw) => {
+      const timestamp = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(raw, map.LOAD_TIMESTAMP) : null);
+      const identity = identifySchool(raw, map);
+      return {
+        date: timestamp.date,
+        time: timestamp.time,
+        school: identity?.school.original ?? "Sin escuela identificada",
+        complete: detectCompletion(raw, completionField),
+      };
+    }).sort((left, right) => `${right.date} ${right.time}`.localeCompare(`${left.date} ${left.time}`)),
   };
+}
+
+export function splitTimestamp(value: unknown): { date: string; time: string } {
+  if (typeof value !== "string" && typeof value !== "number") return { date: "", time: "" };
+  const text = String(value).trim();
+  if (!text) return { date: "", time: "" };
+  const match = text.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}(?::\d{2})?))?/);
+  return match ? { date: match[1], time: match[2] ?? "" } : { date: text, time: "" };
 }
 
 export function round2(value: number): number {

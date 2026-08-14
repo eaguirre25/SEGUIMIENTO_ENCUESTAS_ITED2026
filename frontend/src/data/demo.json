@@ -3,5 +3,6 @@
   "surveyId": "977929",
   "summary": { "total": 0, "complete": 0, "incomplete": 0, "completePct": 0 },
   "schools": [],
-  "mapPoints": []
+  "mapPoints": [],
+  "monitoringRows": []
 }
