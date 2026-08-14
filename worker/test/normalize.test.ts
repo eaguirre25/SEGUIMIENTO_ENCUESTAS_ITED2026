@@ -185,6 +185,28 @@ describe("agregación segura", () => {
     expect(monitored.monitoringRows).toHaveLength(monitored.summary.total);
   });
 
+  it("excluye las cuatro respuestas de prueba de todos los indicadores", () => {
+    const exclusionMap: QuestionMap = {
+      ...map,
+      MANAGEMENT_TYPE: "management",
+      STATE_SCHOOL: "state_school",
+      PRIVATE_SCHOOL: "private_school",
+      SCHOOL: ["private_school", "state_school"],
+      SCHOOL_IDENTIFIER: "school_identifier",
+    };
+    const filtered = buildDashboard([
+      { startdate: "2026-08-12 09:18:21", state_school: "ees26", school_identifier: "00", management: "Estatal", year: "3.º año", submitdate: "2026-08-12 09:20:00" },
+      { startdate: "2026-08-12 09:05:59", state_school: "Ees 1", school_identifier: "1", management: "Estatal", year: "1.º año", submitdate: "2026-08-12 09:08:00" },
+      { startdate: "2026-08-11 23:24:09", school_identifier: "S6", year: "4.º año", submitdate: null },
+      { startdate: "2026-08-11 22:09:20", submitdate: null },
+      { startdate: "2026-08-12 09:18:22", state_school: "ees26", school_identifier: "00", management: "Estatal", year: "3.º año", submitdate: "2026-08-12 09:20:00" },
+    ], "977929", exclusionMap);
+    expect(filtered.summary).toMatchObject({ total: 1, complete: 1, incomplete: 0 });
+    expect(filtered.monitoringRows).toHaveLength(1);
+    expect(filtered.monitoringRows[0].time).toBe("09:18:22");
+    expect(filtered.schools).toHaveLength(1);
+  });
+
   it("cuenta en el total las respuestas sin escuela y conserva su punto como no identificado", () => {
     const withMissingSchool = buildDashboard(
       [{ school: "", year: "2", submitdate: null, lat: -34, lon: -58 }],

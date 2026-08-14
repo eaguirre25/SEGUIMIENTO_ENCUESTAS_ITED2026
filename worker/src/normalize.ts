@@ -2,6 +2,7 @@ import { QUESTION_MAP } from "./question-map";
 import type {
   Counts,
   DashboardPayload,
+  LoadMonitoringRow,
   ManagementType,
   NormalizedResponse,
   RawResponse,
@@ -12,6 +13,13 @@ import type {
 type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL";
 export type QuestionMap = Omit<Record<keyof typeof QUESTION_MAP, string | readonly string[] | null>, OptionalSchoolBranch>
   & Partial<Record<OptionalSchoolBranch, string | readonly string[] | null>>;
+
+const EXCLUDED_TEST_RESPONSE_KEYS = new Set([
+  "2026-08-12|09:18:21|ees26|00|state|3|complete",
+  "2026-08-12|09:05:59|ees 1|1|state|1|complete",
+  "2026-08-11|23:24:09|sin informar|s6|unknown|4|incomplete",
+  "2026-08-11|22:09:20|sin informar|sin informar|unknown||incomplete",
+]);
 
 export function normalizeSchool(value: unknown): { original: string; key: string } | null {
   if (typeof value !== "string") return null;
@@ -172,7 +180,8 @@ export function buildDashboard(
   map: QuestionMap = QUESTION_MAP,
   generatedAt = new Date().toISOString(),
 ): DashboardPayload {
-  const normalized = rawResponses.flatMap((raw) => {
+  const includedResponses = rawResponses.filter((raw) => !isExcludedTestResponse(raw, map));
+  const normalized = includedResponses.flatMap((raw) => {
     const item = normalizeResponse(raw, map);
     return item ? [item] : [];
   });
@@ -180,7 +189,7 @@ export function buildDashboard(
   const schools = new Map<string, SchoolSummary>();
 
   const completionField = firstField(map.COMPLETION) ?? "submitdate";
-  for (const raw of rawResponses) add(summary, detectCompletion(raw, completionField));
+  for (const raw of includedResponses) add(summary, detectCompletion(raw, completionField));
 
   for (const item of normalized) {
     let school = schools.get(item.schoolKey);
@@ -224,7 +233,7 @@ export function buildDashboard(
     surveyId,
     summary: finishCounts(summary),
     schools: schoolList,
-    mapPoints: rawResponses.flatMap((raw) => {
+    mapPoints: includedResponses.flatMap((raw) => {
       const lat = map.LATITUDE ? parseCoordinate(readMappedValue(raw, map.LATITUDE), "lat") : null;
       const lon = map.LONGITUDE ? parseCoordinate(readMappedValue(raw, map.LONGITUDE), "lon") : null;
       if (lat === null || lon === null) return [];
@@ -238,20 +247,44 @@ export function buildDashboard(
         lon,
       }];
     }),
-    monitoringRows: rawResponses.map((raw) => {
-      const timestamp = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(raw, map.LOAD_TIMESTAMP) : null);
-      const identity = identifySchool(raw, map);
-      return {
-        date: timestamp.date,
-        time: timestamp.time,
-        school: schoolAnswerAsReceived(raw, map),
-        schoolIdentifier: answerAsReceived(map.SCHOOL_IDENTIFIER ? readMappedValue(raw, map.SCHOOL_IDENTIFIER) : null),
-        managementType: identity?.managementType ?? "unknown",
-        courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
-        complete: detectCompletion(raw, completionField),
-      };
-    }).sort((left, right) => `${right.date} ${right.time}`.localeCompare(`${left.date} ${left.time}`)),
+    monitoringRows: includedResponses
+      .map((raw) => toMonitoringRow(raw, map))
+      .sort((left, right) => `${right.date} ${right.time}`.localeCompare(`${left.date} ${left.time}`)),
   };
+}
+
+export function isExcludedTestResponse(raw: RawResponse, map: QuestionMap = QUESTION_MAP): boolean {
+  return EXCLUDED_TEST_RESPONSE_KEYS.has(monitoringRowKey(toMonitoringRow(raw, map)));
+}
+
+function toMonitoringRow(raw: RawResponse, map: QuestionMap): LoadMonitoringRow {
+  const timestamp = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(raw, map.LOAD_TIMESTAMP) : null);
+  const identity = identifySchool(raw, map);
+  return {
+    date: timestamp.date,
+    time: timestamp.time,
+    school: schoolAnswerAsReceived(raw, map),
+    schoolIdentifier: answerAsReceived(map.SCHOOL_IDENTIFIER ? readMappedValue(raw, map.SCHOOL_IDENTIFIER) : null),
+    managementType: identity?.managementType ?? "unknown",
+    courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
+    complete: detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
+  };
+}
+
+function monitoringRowKey(row: LoadMonitoringRow): string {
+  return [
+    row.date,
+    row.time,
+    normalizeExclusionText(row.school),
+    normalizeExclusionText(row.schoolIdentifier),
+    row.managementType,
+    row.courseYear ?? "",
+    row.complete ? "complete" : "incomplete",
+  ].join("|");
+}
+
+function normalizeExclusionText(value: string): string {
+  return value.trim().replace(/\s+/g, " ").normalize("NFKC").toLocaleLowerCase("es-AR");
 }
 
 function answerAsReceived(value: unknown): string {
