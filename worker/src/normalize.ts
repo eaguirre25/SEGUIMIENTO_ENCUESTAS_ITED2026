@@ -8,7 +8,9 @@ import type {
   SchoolSummary,
 } from "./types";
 
-export type QuestionMap = Record<keyof typeof QUESTION_MAP, string | readonly string[] | null>;
+type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL";
+export type QuestionMap = Omit<Record<keyof typeof QUESTION_MAP, string | readonly string[] | null>, OptionalSchoolBranch>
+  & Partial<Record<OptionalSchoolBranch, string | readonly string[] | null>>;
 
 export function normalizeSchool(value: unknown): { original: string; key: string } | null {
   if (typeof value !== "string") return null;
@@ -29,13 +31,20 @@ function canonicalSchoolLabel(value: string): string {
     .toLocaleLowerCase("es-AR")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
-  const numberMatch = folded.match(/\d+/g);
-  if (!numberMatch || numberMatch.length !== 1) return value;
-  const number = String(Number(numberMatch[0]));
-  if (!["1", "4", "6", "26", "27"].includes(number)) return value;
-  const onlyNumber = folded === numberMatch[0];
+  const schoolNumber = parseSchoolNumber(folded);
+  if (schoolNumber === null) return value;
+  const number = String(schoolNumber);
+  const onlyNumber = folded === String(Number(folded));
   const schoolMarker = new RegExp(`(?:^| )(?:ees|ee|es|n|numero|escuela|secundaria|media|md) *0*${number}(?: |$)`).test(folded);
   return onlyNumber || schoolMarker ? `EES ${number}` : value;
+}
+
+export function parseSchoolNumber(value: unknown): number | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const matches = String(value).match(/\d+/g);
+  if (!matches || matches.length !== 1) return null;
+  const parsed = Number(matches[0]);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 99 ? parsed : null;
 }
 
 export function detectCompletion(raw: RawResponse, field = "submitdate"): boolean {
@@ -63,13 +72,23 @@ export function parseCoordinate(value: unknown, kind: "lat" | "lon"): number | n
 
 export function normalizeResponse(raw: RawResponse, map: QuestionMap): NormalizedResponse | null {
   if (!map.SCHOOL) throw new Error("Falta configurar QUESTION_MAP.SCHOOL en src/question-map.ts");
-  const school = normalizeSchool(readMappedValue(raw, map.SCHOOL));
+  const management = map.MANAGEMENT_TYPE ? String(readMappedValue(raw, map.MANAGEMENT_TYPE) ?? "")
+    .trim().normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR") : "";
+  const stateSchoolValue = map.STATE_SCHOOL ? readMappedValue(raw, map.STATE_SCHOOL) : null;
+  const privateSchoolValue = map.PRIVATE_SCHOOL ? readMappedValue(raw, map.PRIVATE_SCHOOL) : null;
+  const isStateSchool = management === "estatal";
+  const schoolNumber = isStateSchool ? parseSchoolNumber(stateSchoolValue) : null;
+  const mappedSchoolValue = isStateSchool
+    ? (schoolNumber === null ? stateSchoolValue : `EES ${schoolNumber}`)
+    : management === "privada" ? privateSchoolValue : readMappedValue(raw, map.SCHOOL);
+  const school = normalizeSchool(mappedSchoolValue);
   if (!school) return null;
   const lat = map.LATITUDE ? parseCoordinate(readMappedValue(raw, map.LATITUDE), "lat") : null;
   const lon = map.LONGITUDE ? parseCoordinate(readMappedValue(raw, map.LONGITUDE), "lon") : null;
   return {
     school: school.original,
     schoolKey: school.key,
+    schoolNumber,
     courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
     complete: detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
     lat,
@@ -136,7 +155,7 @@ export function buildDashboard(
   for (const item of normalized) {
     let school = schools.get(item.schoolKey);
     if (!school) {
-      school = { school: item.school, ...emptyCounts(), roles: { student: createRole() } };
+      school = { school: item.school, schoolNumber: item.schoolNumber, ...emptyCounts(), roles: { student: createRole() } };
       schools.set(item.schoolKey, school);
     }
     add(school, item.complete);
@@ -147,6 +166,7 @@ export function buildDashboard(
   const schoolList = [...schools.values()]
     .map((school) => ({
       school: school.school,
+      schoolNumber: school.schoolNumber,
       ...finishCounts(school),
       roles: {
         student: {
@@ -167,11 +187,7 @@ export function buildDashboard(
     surveyId,
     summary: finishCounts(summary),
     schools: schoolList,
-    mapPoints: normalized.flatMap(({ school, schoolKey, lat, lon }) => {
-      if (lat === null || lon === null) return [];
-      const canonicalSchool = schools.get(schoolKey)?.school ?? school;
-      return [{ school: canonicalSchool, lat, lon }];
-    }),
+    mapPoints: [],
   };
 }
 

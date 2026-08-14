@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDashboard, detectCompletion, normalizeSchool, parseCourseYear } from "../src/normalize";
+import { buildDashboard, detectCompletion, normalizeSchool, parseCourseYear, parseSchoolNumber } from "../src/normalize";
 import { decodeExport } from "../src/limesurvey";
 import { QUESTION_MAP } from "../src/question-map";
 import type { QuestionMap } from "../src/normalize";
@@ -19,6 +19,8 @@ describe("normalización", () => {
     expect(QUESTION_MAP.SCHOOL).toEqual(["Q996592", "Q996548"]);
     expect(QUESTION_MAP.MANAGEMENT_TYPE).toBe("Q996591");
     expect(QUESTION_MAP.SCHOOL).not.toContain(QUESTION_MAP.MANAGEMENT_TYPE);
+    expect(QUESTION_MAP.STATE_SCHOOL).toBe("Q996548");
+    expect(QUESTION_MAP.PRIVATE_SCHOOL).toBe("Q996592");
   });
 
   it("decodifica la estructura JSON exportada sin asumir QCodes", () => {
@@ -38,6 +40,32 @@ describe("normalización", () => {
     expect(normalizeSchool("ees26")?.original).toBe("EES 26");
     expect(normalizeSchool("Ee27")?.original).toBe("EES 27");
     expect(normalizeSchool("Santa Ana")?.original).toBe("Santa Ana");
+  });
+
+  it("recupera el único número escolar válido del texto estatal", () => {
+    expect(parseSchoolNumber("Escuela Número 27")).toBe(27);
+    expect(parseSchoolNumber("EES6")).toBe(6);
+    expect(parseSchoolNumber("Escuela 4 anexo 1")).toBeNull();
+    expect(parseSchoolNumber("Santa Ana")).toBeNull();
+  });
+
+  it("usa el número de la pregunta estatal como identidad de escuela", () => {
+    const surveyMap: QuestionMap = {
+      ...map,
+      MANAGEMENT_TYPE: "management",
+      STATE_SCHOOL: "state_school",
+      PRIVATE_SCHOOL: "private_school",
+      SCHOOL: ["private_school", "state_school"],
+    };
+    const result = buildDashboard([
+      { management: "Estatal", state_school: "Media 4", submitdate: "2026-08-13" },
+      { management: "ESTATAL", state_school: "N°4", submitdate: null },
+      { management: "Privada", private_school: "Santa Ana", submitdate: "2026-08-13" },
+    ], "977929", surveyMap);
+    expect(result.schools).toMatchObject([
+      { school: "EES 4", schoolNumber: 4, total: 2 },
+      { school: "Santa Ana", schoolNumber: null, total: 1 },
+    ]);
   });
 
   it("toma la primera rama de escuela informada", () => {
@@ -81,13 +109,12 @@ describe("agregación segura", () => {
     expect(Object.keys(result.schools[0].roles.student.years)).toEqual(["1", "2", "3", "4", "5", "6", "7"]);
   });
 
-  it("elimina coordenadas inválidas y no expone campos personales", () => {
-    expect(result.mapPoints).toHaveLength(2);
-    expect(Object.keys(result.mapPoints[0])).toEqual(["school", "lat", "lon"]);
+  it("no expone coordenadas individuales ni campos personales", () => {
+    expect(result.mapPoints).toEqual([]);
     expect(JSON.stringify(result)).not.toContain("privada");
   });
 
-  it("usa un único nombre canónico para variantes de la misma escuela en el mapa", () => {
+  it("usa un único nombre canónico para variantes de la misma escuela", () => {
     const canonical = buildDashboard(
       [
         { school: "EES 1", year: 1, submitdate: null, lat: -34.5, lon: -58.4 },
@@ -96,7 +123,8 @@ describe("agregación segura", () => {
       "977929",
       map,
     );
-    expect(canonical.mapPoints.map((point) => point.school)).toEqual(["EES 1", "EES 1"]);
+    expect(canonical.schools).toHaveLength(1);
+    expect(canonical.schools[0]).toMatchObject({ school: "EES 1", total: 2 });
   });
 
   it("mantiene completas + incompletas = total", () => {

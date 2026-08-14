@@ -8,6 +8,7 @@ export interface Counts {
 export interface YearCounts extends Counts { year: number }
 export interface SchoolSummary extends Counts {
   school: string;
+  schoolNumber: number | null;
   roles: { student: Counts & { years: Record<string, YearCounts> } };
 }
 
@@ -18,4 +19,3 @@ export interface DashboardPayload {
   schools: SchoolSummary[];
   mapPoints: Array<{ school: string; lat: number; lon: number }>;
 }
-

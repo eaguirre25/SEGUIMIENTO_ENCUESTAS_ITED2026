@@ -1,7 +1,9 @@
-import maplibregl, { type ExpressionSpecification, type GeoJSONSource } from "maplibre-gl";
+import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./style.css";
 import demoData from "./data/demo.json";
+import stateSchoolsData from "./data/state-schools.json";
+import schoolMarkerUrl from "./assets/school-marker.svg";
 import type { DashboardPayload, SchoolSummary } from "./types";
 
 const REFRESH_MS = 60_000;
@@ -18,16 +20,26 @@ let lastSuccessfulFetch = 0;
 let warning = "";
 let map: maplibregl.Map | null = null;
 let mapLoaded = false;
+let schoolMarkers: maplibregl.Marker[] = [];
 let activeTab: "tracking" | "map" = "tracking";
 
-interface PointFeatureCollection {
-  type: "FeatureCollection";
-  features: Array<{
-    type: "Feature";
-    properties: { school: string };
-    geometry: { type: "Point"; coordinates: [number, number] };
-  }>;
+interface StateSchool {
+  schoolNumber: number;
+  name: string;
+  cue: string;
+  locality: string;
+  address: string;
+  coordinates: [number, number];
 }
+
+const STATE_SCHOOLS: StateSchool[] = stateSchoolsData.features.map((feature) => ({
+  schoolNumber: feature.properties.schoolNumber,
+  name: feature.properties.name,
+  cue: feature.properties.cue,
+  locality: feature.properties.locality,
+  address: feature.properties.address,
+  coordinates: [feature.geometry.coordinates[0], feature.geometry.coordinates[1]],
+}));
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("No se encontró #app");
@@ -45,7 +57,7 @@ app.innerHTML = `
     <section id="tracking-view" class="view"><div id="warning-slot"></div><div class="loading">Conectando con la fuente de datos…</div></section>
     <section id="map-view" class="view hidden">
       <div class="map-shell">
-        <aside class="map-legend"><div><p class="eyebrow">CAPAS ACTIVAS</p><h2>Escuelas</h2></div><div id="legend-items"></div></aside>
+        <aside class="map-legend"><div><p class="eyebrow">CAPA TERRITORIAL</p><h2>Escuelas estatales</h2><p id="legend-summary" class="legend-summary"></p></div><div id="legend-items"></div></aside>
         <div id="map"></div>
       </div>
     </section>
@@ -132,7 +144,7 @@ function render(): void {
     </section>
   `;
   tracking.querySelector<HTMLButtonElement>("#save-target")?.addEventListener("click", saveTarget);
-  document.querySelector<HTMLElement>("#map-count")!.textContent = String(data.mapPoints.length);
+  document.querySelector<HTMLElement>("#map-count")!.textContent = String(activeStateSchools().length);
   renderLegend();
   if (mapLoaded) updateMap();
   updateSyncLabel();
@@ -162,7 +174,7 @@ function metric(label: string, value: string | number, color: string, icon: stri
 }
 
 function schoolRow(school: SchoolSummary): string {
-  const name = escapeHtml(school.school);
+  const name = escapeHtml(schoolDisplayName(school));
   return `<details class="school-row">
     <summary><span class="school-name"><i style="--school-color:${colorFor(school.school)}"></i>${name}</span><strong>${school.total}</strong><span class="complete">${school.complete}</span><span class="incomplete">${school.incomplete}</span><span class="pct"><b>${formatPct(school.completePct)}</b><i><em style="width:${school.completePct}%"></em></i></span><span class="chevron">⌄</span></summary>
     <div class="school-detail">
@@ -197,50 +209,77 @@ function initMap(): void {
   map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
   map.on("load", () => {
     mapLoaded = true;
-    map!.addSource("responses", { type: "geojson", data: toGeoJson(), cluster: true, clusterMaxZoom: 13, clusterRadius: 44 });
-    map!.addLayer({ id: "clusters", type: "circle", source: "responses", filter: ["has", "point_count"], paint: { "circle-color": "#A855F7", "circle-radius": ["step", ["get", "point_count"], 18, 25, 24, 100, 31], "circle-stroke-color": "#E9D5FF", "circle-stroke-width": 1.5, "circle-opacity": 0.86 } });
-    map!.addLayer({ id: "cluster-count", type: "symbol", source: "responses", filter: ["has", "point_count"], layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 12 }, paint: { "text-color": "#F4F6FA" } });
-    map!.addLayer({ id: "points", type: "circle", source: "responses", filter: ["!", ["has", "point_count"]], paint: { "circle-radius": 7, "circle-color": colorExpression(), "circle-stroke-color": "#090B10", "circle-stroke-width": 1.5, "circle-opacity": 0.94 } });
+    updateSchoolMarkers();
     fitMap();
   });
 }
 
 function updateMap(): void {
   if (!map || !mapLoaded) return;
-  (map.getSource("responses") as GeoJSONSource).setData(toGeoJson());
-  map.setPaintProperty("points", "circle-color", colorExpression());
+  updateSchoolMarkers();
   if (activeTab === "map") fitMap();
 }
 
-function toGeoJson(): PointFeatureCollection {
-  return {
-    type: "FeatureCollection",
-    features: (data?.mapPoints ?? []).map((point) => ({
-      type: "Feature",
-      properties: { school: point.school },
-      geometry: { type: "Point", coordinates: [point.lon, point.lat] },
-    })),
-  };
-}
-
-function colorExpression(): ExpressionSpecification {
-  const expression: unknown[] = ["match", ["get", "school"]];
-  for (const school of data?.schools ?? []) expression.push(school.school, colorFor(school.school));
-  expression.push("#919AAC");
-  return expression as ExpressionSpecification;
+function updateSchoolMarkers(): void {
+  if (!map) return;
+  schoolMarkers.forEach((marker) => marker.remove());
+  schoolMarkers = [];
+  const summaries = new Map(activeStateSchools().map((school) => [school.schoolNumber, school]));
+  for (const school of STATE_SCHOOLS) {
+    const summary = summaries.get(school.schoolNumber);
+    const element = document.createElement("button");
+    element.type = "button";
+    element.className = `school-map-marker${summary ? " active" : ""}`;
+    element.title = `${school.name}${summary ? ` · ${summary.total} respuestas` : " · sin respuestas"}`;
+    element.setAttribute("aria-label", element.title);
+    const image = document.createElement("img");
+    image.src = schoolMarkerUrl;
+    image.alt = "";
+    element.append(image);
+    if (summary) {
+      const badge = document.createElement("span");
+      badge.textContent = String(summary.total);
+      element.append(badge);
+    }
+    const popup = new maplibregl.Popup({ offset: 32, closeButton: false }).setHTML(`
+      <div class="school-popup">
+        <p>EES ${school.schoolNumber} · CUE ${escapeHtml(school.cue)}</p>
+        <h3>${escapeHtml(school.name)}</h3>
+        <span>${escapeHtml(school.address)} · ${escapeHtml(school.locality)}</span>
+        <strong>${summary ? `${summary.total} respuestas · ${summary.complete} completas · ${summary.incomplete} incompletas` : "Sin respuestas registradas"}</strong>
+      </div>
+    `);
+    schoolMarkers.push(new maplibregl.Marker({ element, anchor: "bottom" })
+      .setLngLat(school.coordinates)
+      .setPopup(popup)
+      .addTo(map));
+  }
 }
 
 function fitMap(): void {
-  if (!map || !data?.mapPoints.length) return;
+  if (!map || !STATE_SCHOOLS.length) return;
   const bounds = new maplibregl.LngLatBounds();
-  data.mapPoints.forEach((point) => bounds.extend([point.lon, point.lat]));
+  STATE_SCHOOLS.forEach((school) => bounds.extend(school.coordinates));
   map.fitBounds(bounds, { padding: 70, maxZoom: 14, duration: 900 });
 }
 
 function renderLegend(): void {
   const legend = document.querySelector<HTMLElement>("#legend-items");
   if (!legend || !data) return;
-  legend.innerHTML = data.schools.map((school) => `<div class="legend-item"><i style="background:${colorFor(school.school)}"></i><span>${escapeHtml(school.school)}</span><b>${school.total}</b></div>`).join("");
+  const active = activeStateSchools();
+  const summary = document.querySelector<HTMLElement>("#legend-summary");
+  if (summary) summary.textContent = `${active.length} con respuestas · ${STATE_SCHOOLS.length} establecimientos en la capa`;
+  legend.innerHTML = active.map((school) => `<div class="legend-item"><img src="${schoolMarkerUrl}" alt=""><span>${escapeHtml(schoolDisplayName(school))}</span><b>${school.total}</b></div>`).join("")
+    || `<p class="legend-empty">Todavía no hay respuestas estatales identificadas.</p>`;
+}
+
+function activeStateSchools(): Array<SchoolSummary & { schoolNumber: number }> {
+  return (data?.schools ?? []).filter((school): school is SchoolSummary & { schoolNumber: number } => school.schoolNumber !== null);
+}
+
+function schoolDisplayName(school: SchoolSummary): string {
+  if (school.schoolNumber === null) return school.school;
+  return STATE_SCHOOLS.find((candidate) => candidate.schoolNumber === school.schoolNumber)?.name ?? school.school;
 }
 
 function colorFor(school: string): string {

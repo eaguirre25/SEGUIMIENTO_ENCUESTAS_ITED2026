@@ -9,7 +9,7 @@ LimeSurvey Cloud
   → RemoteControl 2 (JSON-RPC)
   → Cloudflare Worker (normalización, anonimización y caché de 20 s)
   → GET /api/dashboard
-  → dashboard estático Vite + TypeScript + MapLibre
+  → dashboard estático Vite + TypeScript + MapLibre + capa oficial de escuelas
 ```
 
 El Worker abre una sesión, exporta respuestas completas e incompletas con `export_responses` y libera la session key en un bloque `finally`. El navegador nunca se conecta a LimeSurvey.
@@ -42,6 +42,8 @@ worker/
 Los códigos se verificaron contra RemoteControl 2 y están centralizados en [`worker/src/question-map.ts`](worker/src/question-map.ts):
 
 - `SCHOOL`: `Q996592` o `Q996548`, según la rama respondida.
+- `STATE_SCHOOL`: `Q996548`; se extrae el número escrito para unirlo con `nro_escuel` de la capa oficial.
+- `PRIVATE_SCHOOL`: `Q996592`.
 - `MANAGEMENT_TYPE`: `Q996591` (`Estatal`/`Privada`); no se usa como nombre de escuela.
 - `SCHOOL_IDENTIFIER`: `Q996545` (reservado; todavía no agrupa ni se expone).
 - `COURSE_YEAR`: `Q449329`.
@@ -192,7 +194,7 @@ Las variables que empiezan por `VITE_` son públicas por diseño; nunca colocar 
 
 ## Contrato y privacidad
 
-`GET /api/dashboard` solo entrega fecha de generación, ID de encuesta, agregados, escuelas, cursos y puntos `{ school, lat, lon }`. No conserva ni devuelve ID individual, domicilio, edad, género, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela sí cuentan en el total general, pero no entran al desglose por escuela ni al mapa. Las coordenadas incompletas o fuera de rango tampoco entran al mapa.
+`GET /api/dashboard` solo entrega fecha de generación, ID de encuesta, agregados, escuelas, número escolar y cursos. No conserva ni devuelve ID individual, domicilio, coordenadas individuales, edad, género, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela sí cuentan en el total general, pero no entran al desglose por escuela. El mapa usa exclusivamente las coordenadas institucionales de `frontend/src/data/state-schools.json`, derivadas de la capa `v_uel.shp`.
 
 El nombre se normaliza con `trim`, espacios consecutivos y una clave en minúsculas. Se conserva como etiqueta la primera variante limpia observada. No se hace fuzzy matching.
 

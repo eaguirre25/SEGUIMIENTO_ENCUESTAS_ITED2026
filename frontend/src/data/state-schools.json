@@ -1,0 +1,839 @@
+{
+  "type": "FeatureCollection",
+  "source": "v_uel.shp · Escuelas secundarias estatales · General San Martín",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 1,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº1 \"PERITO MORENO\"",
+        "cue": "060746900",
+        "locality": "GENERAL SAN MARTIN",
+        "address": "JUAREZ 3626"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.53286965770729,
+          -34.579418626467785
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 2,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº2 \"ARMADA ARGENTINA\"",
+        "cue": "060979700",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "CARLOS ECHAGUE 7636"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.576854383821676,
+          -34.52953381083612
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 3,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº3 \"LEOPOLDO LUGONES\"",
+        "cue": "060608000",
+        "locality": "SAN ANDRES",
+        "address": "JOSÉ M CAMPOS ESQ. SAN JUAN 1918"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.53682636578945,
+          -34.559027187849914
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 4,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº4 \"DR. RICARDO ROJAS\"",
+        "cue": "060973800",
+        "locality": "BARRIO PARQUE GENERAL SAN MARTIN",
+        "address": "DIAG. 96 -ALSINA 4945"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.5648474263665,
+          -34.56985470163255
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 5,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº5 \"DR. BERNARDO DE MONTEAGUDO\"",
+        "cue": "060018600",
+        "locality": "VILLA LYNCH",
+        "address": "ESPORA 4022"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.52624383384932,
+          -34.59089060201903
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 6,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº6 \"ALFONSINA STORNI\"",
+        "cue": "061154600",
+        "locality": "BILLINGHURST",
+        "address": "SAN LORENZO 5951"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.57564594050665,
+          -34.57647564453479
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 7,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA N°7",
+        "cue": "060613300",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "BALCARCE (E/ BELGRANO Y ARTIGAS) 277"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.56027776330699,
+          -34.552308164089894
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 8,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº8 \"ESTEBAN ECHEVERRÍA\"",
+        "cue": "060979200",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "RAWSON ESQUINA ITALIA 1918"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.56406762422034,
+          -34.53064678482067
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 10,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº10",
+        "cue": "060996300",
+        "locality": "BARRIO PARQUE GENERAL SAN MARTIN",
+        "address": "LIBERTAD 6845"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.59453414008958,
+          -34.557597548582756
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 12,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA N°12 \"EDUARDO WILDE\"",
+        "cue": "060860300",
+        "locality": "GENERAL SAN MARTIN",
+        "address": "PROF. AGUSTÍN ROGELIO VIDAL 3676"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.541649187051476,
+          -34.57285043887576
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 13,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº13 \"GENERAL MANUEL BELGRANO\"",
+        "cue": "061195200",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "LACROZE 133"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.55358894964156,
+          -34.54835443996671
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 21,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº21 \"TUPAC AMARU\"",
+        "cue": "061072200",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "MITRE 5035"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.5631830816529,
+          -34.55412377075162
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 22,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº22 \"ROSARIO VERA PEÑALOZA\"",
+        "cue": "060045200",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "BALCARCE 3469"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.5626132639898,
+          -34.554205979122024
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 23,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº23",
+        "cue": "061475700",
+        "locality": "VILLA GRANADEROS DE SAN MARTIN",
+        "address": "AV.FLEMING 3956"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.528447989688544,
+          -34.540217805769245
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 24,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº24",
+        "cue": "061735300",
+        "locality": "BARRIO PARQUE GENERAL SAN MARTIN",
+        "address": "SARMIENTO E/ GÜEMES Y SAN MARTÍN 1352"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.60315740872913,
+          -34.55503051476263
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 54,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº54",
+        "cue": "061742600",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "JOSÉ HERNANDEZ 3897"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.5625978337362,
+          -34.559346825552026
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 45,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA N°45",
+        "cue": "061742700",
+        "locality": "VILLA MAIPU",
+        "address": "ESTRADA ESQ. LAS HERAS 2985"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.52997694068204,
+          -34.573506197352465
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 56,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº56",
+        "cue": "061742800",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "INGENIERO HUERGO E/ SAENZ Y MEDRANO 8630"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.57742354908429,
+          -34.516977834367445
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 49,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº49",
+        "cue": "061793800",
+        "locality": "GENERAL SAN MARTIN",
+        "address": "BELGRANO E/ URUGUAY Y SAN MARTÍN 3740"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.53704984677576,
+          -34.57762263167507
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 46,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº46",
+        "cue": "061793900",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "DIAG. 180 E/ ARTIGAS Y S. DEL ESTERO 3528"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.58209741246458,
+          -34.53686492497576
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 33,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº33",
+        "cue": "061794000",
+        "locality": "VILLA GRANADEROS DE SAN MARTIN",
+        "address": "MENDOZA 1069"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.522632986208265,
+          -34.5544770697456
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 26,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº26 \"LUIS ALBERTO SPINETTA\"",
+        "cue": "061794100",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "AVDA. 9 DE JULIO ESQ. MONACO 6351"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.58024165297281,
+          -34.54931502182212
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 25,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº25",
+        "cue": "061794200",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "MALVINAS ARGENTINAS 8361"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.58666465575269,
+          -34.53223094443333
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 35,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº35",
+        "cue": "061794300",
+        "locality": "VILLA MAIPU",
+        "address": "JULIO A. ROCA 2400"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.52371951724065,
+          -34.56102286900955
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 30,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº30",
+        "cue": "061812300",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "ESPAÑA 5640"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.58087998851961,
+          -34.56105266894495
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 55,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº55",
+        "cue": "061812400",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "BOULEVARD BALLESTER 554"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.55821440377057,
+          -34.54359499611156
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 31,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº31",
+        "cue": "061812600",
+        "locality": "SAN ANDRES",
+        "address": "SAENZ PEÑA 2953"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.535821903556794,
+          -34.568491647770685
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 53,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº53",
+        "cue": "061812700",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "BARTOLOME MITRE E/ CUBA Y ENSENADA 5473"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.56724767112536,
+          -34.55100767428584
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 28,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº28",
+        "cue": "061812800",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "RIO NEGRO E/ LACROZE Y BOULEVARD 350"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.56703775039075,
+          -34.53702023069851
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 40,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº40",
+        "cue": "061812900",
+        "locality": "GENERAL SAN MARTIN",
+        "address": "OMBU ESQ. TUNUYAN 1490"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.54782860343583,
+          -34.59196585456398
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 52,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº52 \"DOCTOR RENÉ FAVALORO\"",
+        "cue": "061813000",
+        "locality": "VILLA LIBERTAD",
+        "address": "INFANTA ISABEL 2649"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.56240304926018,
+          -34.58732461963492
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 44,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº44",
+        "cue": "061813100",
+        "locality": "BARRIO PARQUE GENERAL SAN MARTIN",
+        "address": "90 E/15 Y 17 750"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.53105598821325,
+          -34.54483012390205
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 32,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº32",
+        "cue": "061813200",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "PROFESOR SIMON Y QUINTANA 1439"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.55341761949593,
+          -34.53398588331286
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 48,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº 48 \"VICTORIA OCAMPO\"",
+        "cue": "061845900",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "AMÉRICA 151"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.55357322707913,
+          -34.55498186412373
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 51,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº51",
+        "cue": "061864600",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "PROFESOR AGUER 6641"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.57362935381056,
+          -34.538734576838664
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 57,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA N°57",
+        "cue": "061864700",
+        "locality": "VILLA MAIPU",
+        "address": "ESTRADA 2400"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.52431749535482,
+          -34.570555940803345
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 39,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº39",
+        "cue": "061864800",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "GENERAL FRÍAS 7560"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.57847792126824,
+          -34.53142539855787
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 47,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº47",
+        "cue": "061864900",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "C. CHAGÜE 8287"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.582017076925474,
+          -34.52456227762644
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 38,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº38",
+        "cue": "061865000",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "ESTRADA 9060"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.578349297181255,
+          -34.51267774937809
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 27,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº27",
+        "cue": "061865100",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "AGUSTÍN ÁLVAREZ 2327"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.54205079349586,
+          -34.554060506599434
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 42,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº42",
+        "cue": "061865200",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "JOSÉ INGENIEROS 4606"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.59046560590199,
+          -34.544280965693474
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 50,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº50",
+        "cue": "061865300",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "LIBERTADOR GENERAL SAN MARTÍN 5810"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.581864207280795,
+          -34.55782558937586
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 29,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº29",
+        "cue": "061888200",
+        "locality": "SAN ANDRES",
+        "address": "MISIONES 3680"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.55157958872298,
+          -34.56243912103011
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 37,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº37",
+        "cue": "061888400",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "CUBA 4450"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.57361237823427,
+          -34.5576676212887
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 43,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº43",
+        "cue": "061899100",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "PATAGONIA Y JOSÉ INGENIEROS 7493"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.5907171076074,
+          -34.54449099606206
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 36,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº36",
+        "cue": "062027700",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "SAENZ PEÑA 3645"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.57722710334707,
+          -34.54389136949053
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 11,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº11",
+        "cue": "062297600",
+        "locality": "GENERAL SAN MARTIN",
+        "address": "PROF. AGUSTÍN ROGELIO VIDAL 3676"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.54151320806956,
+          -34.57275422435068
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 20,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº20",
+        "cue": "062297700",
+        "locality": "GENERAL SAN MARTIN",
+        "address": "PROF. AGUSTÍN ROGELIO VIDAL 3676"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.54140268410566,
+          -34.57266885346801
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 58,
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA Nº 58",
+        "cue": "062477200",
+        "locality": "LOMA HERMOSA",
+        "address": "LAS CALAS 6912"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.592131203458436,
+          -34.55231473619864
+        ]
+      }
+    }
+  ]
+}

@@ -11,6 +11,7 @@ export type RawResponse = Record<string, unknown>;
 export interface NormalizedResponse {
   school: string;
   schoolKey: string;
+  schoolNumber: number | null;
   courseYear: number | null;
   complete: boolean;
   lat: number | null;
@@ -34,6 +35,7 @@ export interface RoleCounts extends Counts {
 
 export interface SchoolSummary extends Counts {
   school: string;
+  schoolNumber: number | null;
   roles: { student: RoleCounts };
 }
 
