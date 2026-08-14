@@ -66,7 +66,8 @@ function corsHeaders(origin: string | null, allowed: string): Headers | undefine
   return new Headers({
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Headers": "Accept, Authorization, Cache-Control, Content-Type, Pragma",
+    "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   });
 }

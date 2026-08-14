@@ -30,12 +30,20 @@ describe("protección del dashboard", () => {
     expect(response.status).toBe(401);
   });
 
-  it("autoriza el encabezado Authorization en la preflight CORS", async () => {
+  it("autoriza los encabezados de autenticación y recarga en la preflight CORS", async () => {
     const response = await worker.fetch(new Request("https://worker.example/api/dashboard", {
       method: "OPTIONS",
-      headers: { Origin: env.DASHBOARD_ALLOWED_ORIGIN },
+      headers: {
+        Origin: env.DASHBOARD_ALLOWED_ORIGIN,
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "authorization, cache-control, pragma",
+      },
     }), env);
     expect(response.status).toBe(204);
-    expect(response.headers.get("Access-Control-Allow-Headers")).toContain("Authorization");
+    const allowedHeaders = response.headers.get("Access-Control-Allow-Headers");
+    expect(allowedHeaders).toContain("Authorization");
+    expect(allowedHeaders).toContain("Cache-Control");
+    expect(allowedHeaders).toContain("Pragma");
+    expect(response.headers.get("Access-Control-Max-Age")).toBe("86400");
   });
 });
