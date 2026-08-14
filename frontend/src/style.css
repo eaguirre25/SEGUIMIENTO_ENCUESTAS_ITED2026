@@ -20,12 +20,12 @@ button { color: inherit; }
 .sync { display: flex; align-items: center; gap: 9px; color: #b5bdcc; font: 600 14px "Rajdhani", sans-serif; }
 .pulse { width: 8px; height: 8px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 0 #34d39980; animation: pulse 2s infinite; }
 @keyframes pulse { 70% { box-shadow: 0 0 0 8px #34d39900; } }
-.tabs { height: 54px; padding: 0 clamp(20px, 4vw, 64px); display: flex; gap: 24px; border-bottom: 1px solid #242936; }
-.tab { position: relative; border: 0; background: none; padding: 0 4px; color: #919aac; font-weight: 600; cursor: pointer; }
+.tabs { height: 64px; padding: 0 clamp(20px, 4vw, 64px); display: flex; gap: 28px; border-bottom: 1px solid #242936; }
+.tab { position: relative; border: 0; background: none; padding: 0 4px; color: #919aac; font-weight: 700; cursor: pointer; }
 .tab::after { content: ""; position: absolute; inset: auto 0 -1px; height: 2px; background: #a855f7; transform: scaleX(0); transition: transform .2s; box-shadow: 0 -2px 11px #a855f7; }
 .tab.active { color: #f4f6fa; }
 .tab.active::after { transform: scaleX(1); }
-.tab-count { margin-left: 6px; border: 1px solid #343b4b; border-radius: 999px; padding: 2px 7px; font: 700 12px "Rajdhani"; }
+.tab-count { margin-left: 8px; border: 1px solid #465064; border-radius: 999px; padding: 3px 9px; font: 700 16px "Rajdhani"; }
 .population-bar { padding: 14px clamp(20px, 4vw, 64px); display: flex; align-items: center; gap: 18px; border-bottom: 1px solid #242936; background: #0c1017; }
 .population-bar > span { flex: 0 0 auto; color: #919aac; font-size: 15px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .population-switcher { display: flex; flex-wrap: wrap; gap: 9px; }
@@ -165,7 +165,7 @@ body, button, input, .brand p, .eyebrow, .sync, .tab-count, .live-badge,
 .top-actions { display: flex; align-items: center; gap: 16px; }
 .logout { border: 1px solid #475166; border-radius: 9px; padding: 8px 13px; background: #171c26; font-size: 14px; font-weight: 600; cursor: pointer; }
 .logout:hover { border-color: #a855f7; background: #a855f719; }
-.tab { font-size: 16px; }
+.tab { font-size: 21px; }
 .section-heading h2 { font-size: 23px; }
 .metric p { font-size: 15px; }
 .muted { font-size: 15px; line-height: 1.4; }
