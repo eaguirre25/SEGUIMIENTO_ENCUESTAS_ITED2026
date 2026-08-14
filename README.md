@@ -7,12 +7,12 @@ Aplicación de lectura para seguir el operativo de estudiantes sin exponer crede
 ```text
 LimeSurvey Cloud
   → RemoteControl 2 (JSON-RPC)
-  → Cloudflare Worker (normalización, anonimización y caché de 20 s)
+  → Cloudflare Worker (normalización, acceso protegido y caché de 20 s)
   → GET /api/dashboard
   → dashboard estático Vite + TypeScript + MapLibre + capa oficial de escuelas
 ```
 
-El Worker abre una sesión, exporta respuestas completas e incompletas con `export_responses` y libera la session key en un bloque `finally`. El navegador nunca se conecta a LimeSurvey.
+El Worker abre una sesión, exporta respuestas completas e incompletas con `export_responses` y libera la session key en un bloque `finally`. El navegador nunca se conecta a LimeSurvey. El HTML público no contiene datos: el Worker exige usuario y contraseña antes de entregar métricas o ubicaciones.
 
 Producción:
 
@@ -24,11 +24,13 @@ Producción:
 ```text
 frontend/
   src/data/demo.json       Contrato vacío para desarrollo sin datos ficticios
-  src/main.ts              UI, actualización, tabla, recipiente y mapa
+  src/main.ts              UI, autenticación, actualización, tabla y mapa
+  src/data/state-schools.json    Capa de escuelas estatales
+  src/data/private-schools.json  Capas privadas consolidadas y deduplicadas
   src/style.css            Sistema visual responsive oscuro
   vite.config.ts           Desarrollo y base de GitHub Pages
 worker/
-  src/index.ts             Endpoint, CORS y caché
+  src/index.ts             Endpoint, autenticación, CORS y caché
   src/limesurvey.ts        Cliente JSON-RPC y ciclo de sesión
   src/normalize.ts         Normalización y agregado seguro
   src/question-map.ts      Único mapa de QCodes/columnas
@@ -83,6 +85,8 @@ En PowerShell, `Copy-Item frontend/.env.example frontend/.env.local` es equivale
    npx wrangler secret put LIMESURVEY_RPC_URL --env production
    npx wrangler secret put LIMESURVEY_USERNAME --env production
    npx wrangler secret put LIMESURVEY_PASSWORD --env production
+   npx wrangler secret put DASHBOARD_USERNAME --env production
+   npx wrangler secret put DASHBOARD_PASSWORD --env production
    ```
 
    Para `LIMESURVEY_RPC_URL`, ingresar:
@@ -97,6 +101,8 @@ En PowerShell, `Copy-Item frontend/.env.example frontend/.env.local` es equivale
    LIMESURVEY_RPC_URL="https://programaited.limesurvey.net/index.php/admin/remotecontrol"
    LIMESURVEY_USERNAME="usuario-local"
    LIMESURVEY_PASSWORD="contraseña-local"
+   DASHBOARD_USERNAME="usuario-del-panel"
+   DASHBOARD_PASSWORD="contraseña-del-panel"
    ```
 
 7. Ejecutar el Worker:
@@ -109,7 +115,7 @@ En PowerShell, `Copy-Item frontend/.env.example frontend/.env.local` es equivale
 8. Probar el endpoint desde otra terminal:
 
    ```bash
-   curl http://localhost:8787/api/dashboard
+   curl -u usuario-del-panel:contraseña-del-panel http://localhost:8787/api/dashboard
    ```
 
 9. Configurar el frontend real en `frontend/.env.local`:
@@ -185,6 +191,8 @@ En Cloudflare Pages también puede conectarse GitHub usando `frontend` como raí
 | `LIMESURVEY_RPC_URL` | secreto | Cloudflare Secret | endpoint RemoteControl |
 | `LIMESURVEY_USERNAME` | secreto | Cloudflare Secret | usuario RPC |
 | `LIMESURVEY_PASSWORD` | secreto | Cloudflare Secret | contraseña RPC |
+| `DASHBOARD_USERNAME` | secreto | Cloudflare Secret | usuario del visor |
+| `DASHBOARD_PASSWORD` | secreto | Cloudflare Secret | contraseña del visor |
 | `LIMESURVEY_STUDENT_SURVEY_ID` | variable | `wrangler.jsonc` | `977929` |
 | `DASHBOARD_ALLOWED_ORIGIN` | variable | `wrangler.jsonc` | origen exacto del frontend |
 | `VITE_DATA_MODE` | build frontend | `.env.local`/CI | `demo` o `api` |
@@ -194,7 +202,9 @@ Las variables que empiezan por `VITE_` son públicas por diseño; nunca colocar 
 
 ## Contrato y privacidad
 
-`GET /api/dashboard` solo entrega fecha de generación, ID de encuesta, agregados, escuelas, número escolar y cursos. No conserva ni devuelve ID individual, domicilio, coordenadas individuales, edad, género, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela sí cuentan en el total general, pero no entran al desglose por escuela. El mapa usa exclusivamente las coordenadas institucionales de `frontend/src/data/state-schools.json`, derivadas de la capa `v_uel.shp`.
+`GET /api/dashboard` exige autenticación y solo entrega fecha de generación, ID de encuesta, agregados, escuela, tipo de gestión, estado de completitud y coordenadas mínimas necesarias para el mapa. No devuelve ID individual, domicilio, edad, género, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela cuentan en el total general y, si tienen coordenadas válidas, aparecen como “sin escuela identificada”.
+
+El mapa diferencia dos objetos: el punto de matrícula proviene de la coordenada informada en la respuesta; el ícono de escuela proviene de las capas institucionales. Los hilos unen ambos sin reemplazar ninguna coordenada. La matrícula estatal se representa con círculos, la privada con triángulos y puede verse como puntos o mapa de calor. El contador concilia explícitamente respuestas totales con puntos dibujables y respuestas sin coordenadas.
 
 El nombre se normaliza con `trim`, espacios consecutivos y una clave en minúsculas. Se conserva como etiqueta la primera variante limpia observada. No se hace fuzzy matching.
 

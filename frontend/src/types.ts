@@ -5,10 +5,13 @@ export interface Counts {
   completePct: number;
 }
 
+export type ManagementType = "state" | "private" | "unknown";
+
 export interface YearCounts extends Counts { year: number }
 export interface SchoolSummary extends Counts {
   school: string;
   schoolNumber: number | null;
+  managementType: ManagementType;
   roles: { student: Counts & { years: Record<string, YearCounts> } };
 }
 
@@ -17,5 +20,12 @@ export interface DashboardPayload {
   surveyId: string;
   summary: Counts;
   schools: SchoolSummary[];
-  mapPoints: Array<{ school: string; lat: number; lon: number }>;
+  mapPoints: Array<{
+    school: string;
+    schoolNumber: number | null;
+    managementType: ManagementType;
+    complete: boolean;
+    lat: number;
+    lon: number;
+  }>;
 }
