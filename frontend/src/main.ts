@@ -55,12 +55,15 @@ interface PrivateSchool {
 type SchoolLocation = StateSchool | PrivateSchool;
 type Population = "students" | "teachers" | "families";
 type DashboardView = "tracking" | "map" | "monitoring";
+type MonitoringRow = DashboardPayload["monitoringRows"][number];
+type MonitoringSortKey = "date" | "time" | "school" | "managementType" | "courseYear" | "complete";
 
 const POPULATION_LABELS: Record<Population, string> = {
   students: "ESTUDIANTES",
   teachers: "DOCENTES",
   families: "FAMILIAS",
 };
+let monitoringSort: { key: MonitoringSortKey; direction: "asc" | "desc" } = { key: "date", direction: "desc" };
 
 interface ResolvedMapPoint {
   schoolId: string;
@@ -99,6 +102,7 @@ const PRIVATE_SCHOOLS: PrivateSchool[] = privateSchoolsData.features.map((featur
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("No se encontró #app");
+document.body.dataset.population = activePopulation;
 
 app.innerHTML = `
   <header class="topbar">
@@ -305,6 +309,7 @@ function payloadForPopulation(population: Population): DashboardPayload | null {
 function selectPopulation(population: Population): void {
   if (!POPULATION_LABELS[population] || activePopulation === population) return;
   activePopulation = population;
+  document.body.dataset.population = population;
   data = payloadForPopulation(population);
   filtersInitialized = false;
   selectedSchoolIds.clear();
@@ -437,7 +442,7 @@ function closeSchoolModal(): void {
 function renderMonitoring(): void {
   const view = document.querySelector<HTMLElement>("#monitoring-view");
   if (!view || !data) return;
-  const rows = data.monitoringRows;
+  const rows = sortedMonitoringRows(data.monitoringRows);
   view.innerHTML = `
     <section class="monitoring-panel panel">
       <div class="monitoring-heading section-heading">
@@ -445,7 +450,7 @@ function renderMonitoring(): void {
         <span>${formatNumber(rows.length)} registros</span>
       </div>
       ${rows.length ? `<div class="monitoring-table-wrap"><table class="monitoring-table">
-        <thead><tr><th>Fecha</th><th>Hora</th><th>¿A qué escuela vas?</th><th>Gestión</th><th>Año de secundaria</th><th>Encuesta completa</th></tr></thead>
+        <thead><tr>${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("¿A qué escuela vas?", "school")}${sortHeader("Gestión", "managementType")}${sortHeader("Año de secundaria", "courseYear")}${sortHeader("Encuesta completa", "complete")}</tr></thead>
         <tbody>${rows.map((row) => `<tr>
           <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.school)}</td>
           <td><span class="management-badge ${row.managementType}">${managementLabel(row.managementType)}</span></td>
@@ -454,6 +459,44 @@ function renderMonitoring(): void {
         </tr>`).join("")}</tbody>
       </table></div>` : `<div class="monitoring-empty"><strong>Sin cargas registradas</strong><p>Los resultados de ${POPULATION_LABELS[activePopulation].toLocaleLowerCase("es-AR")} se mostrarán aquí cuando la encuesta esté conectada.</p></div>`}
     </section>`;
+  view.querySelectorAll<HTMLButtonElement>(".sort-button").forEach((button) => {
+    button.addEventListener("click", () => changeMonitoringSort(button.dataset.sort as MonitoringSortKey));
+  });
+}
+
+function sortHeader(label: string, key: MonitoringSortKey): string {
+  const active = monitoringSort.key === key;
+  const ariaSort = active ? (monitoringSort.direction === "asc" ? "ascending" : "descending") : "none";
+  const indicator = active ? (monitoringSort.direction === "asc" ? "↑" : "↓") : "↕";
+  return `<th aria-sort="${ariaSort}"><button class="sort-button${active ? " active" : ""}" type="button" data-sort="${key}">${label}<span aria-hidden="true">${indicator}</span></button></th>`;
+}
+
+function changeMonitoringSort(key: MonitoringSortKey): void {
+  monitoringSort = monitoringSort.key === key
+    ? { key, direction: monitoringSort.direction === "asc" ? "desc" : "asc" }
+    : { key, direction: "asc" };
+  renderMonitoring();
+}
+
+function sortedMonitoringRows(rows: MonitoringRow[]): MonitoringRow[] {
+  return [...rows].sort((left, right) => {
+    const leftValue = monitoringSortValue(left, monitoringSort.key);
+    const rightValue = monitoringSortValue(right, monitoringSort.key);
+    const leftMissing = leftValue === null || leftValue === "";
+    const rightMissing = rightValue === null || rightValue === "";
+    if (leftMissing !== rightMissing) return leftMissing ? 1 : -1;
+    const comparison = typeof leftValue === "number" && typeof rightValue === "number"
+      ? leftValue - rightValue
+      : String(leftValue).localeCompare(String(rightValue), "es-AR", { numeric: true, sensitivity: "base" });
+    return monitoringSort.direction === "asc" ? comparison : -comparison;
+  });
+}
+
+function monitoringSortValue(row: MonitoringRow, key: MonitoringSortKey): string | number | null {
+  if (key === "date") return `${row.date} ${row.time}`;
+  if (key === "managementType") return managementLabel(row.managementType);
+  if (key === "complete") return row.complete ? 1 : 0;
+  return row[key];
 }
 
 function switchTab(tab: DashboardView): void {

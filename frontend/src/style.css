@@ -5,7 +5,10 @@
 
 :root { color-scheme: dark; font-family: "Rajdhani", system-ui, sans-serif; font-size: 17px; background: #090b10; color: #f4f6fa; font-synthesis: none; }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 18% -20%, #28133f 0, transparent 29rem), #090b10; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: #090b10; transition: background .45s ease; }
+body[data-population="students"] { background: radial-gradient(circle at 18% -12%, #4b1f6f 0, #231137 24rem, transparent 52rem), #090b10; }
+body[data-population="teachers"] { background: radial-gradient(circle at 18% -12%, #2b7a54 0, #123825 24rem, transparent 52rem), #08100c; }
+body[data-population="families"] { background: radial-gradient(circle at 18% -12%, #a94e18 0, #4a250d 24rem, transparent 52rem), #120b07; }
 button, input { font: inherit; }
 button { color: inherit; }
 .topbar { min-height: 86px; padding: 18px clamp(20px, 4vw, 64px); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #242936; background: #090b10cc; backdrop-filter: blur(14px); }
@@ -106,6 +109,10 @@ main { max-width: 1540px; margin: auto; padding: clamp(20px, 3vw, 46px) clamp(16
 .monitoring-table-wrap { max-height: calc(100vh - 330px); min-height: 420px; overflow: auto; }
 .monitoring-table { width: 100%; border-collapse: collapse; font-size: 18px; }
 .monitoring-table th { position: sticky; z-index: 1; top: 0; padding: 16px 22px; border-bottom: 1px solid #394252; color: #aab3c2; background: #0c1017; text-align: left; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; }
+.sort-button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; font-size: inherit; font-weight: 700; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.sort-button span { color: #6f7a8d; font-size: 18px; }
+.sort-button:hover, .sort-button.active { color: #f4f6fa; }
+.sort-button.active span { color: #c084fc; text-shadow: 0 0 10px #a855f7; }
 .monitoring-table td { padding: 17px 22px; border-bottom: 1px solid #222936; color: #dce1e9; }
 .monitoring-table tbody tr:hover { background: #ffffff05; }
 .monitoring-table th:nth-child(1), .monitoring-table td:nth-child(1) { width: 155px; }

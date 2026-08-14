@@ -108,6 +108,17 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
   return { school, schoolNumber, managementType };
 }
 
+function schoolAnswerAsReceived(raw: RawResponse, map: QuestionMap): string {
+  const managementType = normalizeManagementType(map.MANAGEMENT_TYPE ? readMappedValue(raw, map.MANAGEMENT_TYPE) : null);
+  const field = managementType === "state" && map.STATE_SCHOOL
+    ? map.STATE_SCHOOL
+    : managementType === "private" && map.PRIVATE_SCHOOL
+      ? map.PRIVATE_SCHOOL
+      : map.SCHOOL;
+  const value = field ? readMappedValue(raw, field) : null;
+  return value === null || value === undefined ? "Sin informar" : String(value);
+}
+
 function normalizeManagementType(value: unknown): ManagementType {
   const normalized = String(value ?? "").trim().normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR");
   if (normalized === "estatal") return "state";
@@ -233,7 +244,7 @@ export function buildDashboard(
       return {
         date: timestamp.date,
         time: timestamp.time,
-        school: identity?.school.original ?? "Sin escuela identificada",
+        school: schoolAnswerAsReceived(raw, map),
         managementType: identity?.managementType ?? "unknown",
         courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
         complete: detectCompletion(raw, completionField),
