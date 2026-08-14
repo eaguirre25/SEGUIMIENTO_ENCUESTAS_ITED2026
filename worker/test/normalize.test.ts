@@ -109,8 +109,11 @@ describe("agregación segura", () => {
     expect(Object.keys(result.schools[0].roles.student.years)).toEqual(["1", "2", "3", "4", "5", "6", "7"]);
   });
 
-  it("no expone coordenadas individuales ni campos personales", () => {
-    expect(result.mapPoints).toEqual([]);
+  it("expone solo los campos mínimos necesarios para el mapa de matrícula", () => {
+    expect(result.mapPoints).toHaveLength(2);
+    expect(Object.keys(result.mapPoints[0])).toEqual([
+      "school", "schoolNumber", "managementType", "complete", "lat", "lon",
+    ]);
     expect(JSON.stringify(result)).not.toContain("privada");
   });
 
@@ -134,7 +137,7 @@ describe("agregación segura", () => {
     }
   });
 
-  it("cuenta en el total las respuestas sin escuela sin exponerlas en escuelas o mapa", () => {
+  it("cuenta en el total las respuestas sin escuela y conserva su punto como no identificado", () => {
     const withMissingSchool = buildDashboard(
       [{ school: "", year: "2", submitdate: null, lat: -34, lon: -58 }],
       "977929",
@@ -142,6 +145,13 @@ describe("agregación segura", () => {
     );
     expect(withMissingSchool.summary).toMatchObject({ total: 1, complete: 0, incomplete: 1 });
     expect(withMissingSchool.schools).toEqual([]);
-    expect(withMissingSchool.mapPoints).toEqual([]);
+    expect(withMissingSchool.mapPoints).toEqual([{
+      school: "Sin escuela identificada",
+      schoolNumber: null,
+      managementType: "unknown",
+      complete: false,
+      lat: -34,
+      lon: -58,
+    }]);
   });
 });

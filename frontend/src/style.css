@@ -1,6 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+@font-face { font-family: "Rajdhani"; src: url("./assets/fonts/Rajdhani-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Rajdhani"; src: url("./assets/fonts/Rajdhani-Medium.ttf") format("truetype"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Rajdhani"; src: url("./assets/fonts/Rajdhani-SemiBold.ttf") format("truetype"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Rajdhani"; src: url("./assets/fonts/Rajdhani-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
 
-:root { color-scheme: dark; font-family: "DM Sans", system-ui, sans-serif; background: #090b10; color: #f4f6fa; font-synthesis: none; }
+:root { color-scheme: dark; font-family: "Rajdhani", system-ui, sans-serif; font-size: 17px; background: #090b10; color: #f4f6fa; font-synthesis: none; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 18% -20%, #28133f 0, transparent 29rem), #090b10; }
 button, input { font: inherit; }
@@ -8,9 +11,9 @@ button { color: inherit; }
 .topbar { min-height: 86px; padding: 18px clamp(20px, 4vw, 64px); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #242936; background: #090b10cc; backdrop-filter: blur(14px); }
 .brand { display: flex; align-items: center; gap: 14px; }
 .brand-mark { width: 11px; height: 38px; border-radius: 8px; background: linear-gradient(#22d3ee, #a855f7); box-shadow: 0 0 22px #a855f799; }
-.brand p, .eyebrow { margin: 0 0 4px; color: #919aac; font: 700 10px/1.2 "Space Mono", monospace; letter-spacing: .16em; }
+.brand p, .eyebrow { margin: 0 0 4px; color: #919aac; font: 700 12px/1.2 "Rajdhani", sans-serif; letter-spacing: .16em; }
 .brand h1 { margin: 0; font-size: clamp(20px, 2vw, 27px); letter-spacing: -.03em; }
-.sync { display: flex; align-items: center; gap: 9px; color: #b5bdcc; font: 12px "Space Mono", monospace; }
+.sync { display: flex; align-items: center; gap: 9px; color: #b5bdcc; font: 600 14px "Rajdhani", sans-serif; }
 .pulse { width: 8px; height: 8px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 0 #34d39980; animation: pulse 2s infinite; }
 @keyframes pulse { 70% { box-shadow: 0 0 0 8px #34d39900; } }
 .tabs { height: 54px; padding: 0 clamp(20px, 4vw, 64px); display: flex; gap: 24px; border-bottom: 1px solid #242936; }
@@ -18,7 +21,7 @@ button { color: inherit; }
 .tab::after { content: ""; position: absolute; inset: auto 0 -1px; height: 2px; background: #a855f7; transform: scaleX(0); transition: transform .2s; box-shadow: 0 -2px 11px #a855f7; }
 .tab.active { color: #f4f6fa; }
 .tab.active::after { transform: scaleX(1); }
-.tab-count { margin-left: 6px; border: 1px solid #343b4b; border-radius: 999px; padding: 2px 7px; font: 10px "Space Mono"; }
+.tab-count { margin-left: 6px; border: 1px solid #343b4b; border-radius: 999px; padding: 2px 7px; font: 700 12px "Rajdhani"; }
 main { max-width: 1540px; margin: auto; padding: clamp(20px, 3vw, 46px) clamp(16px, 4vw, 64px) 60px; }
 .hidden { display: none !important; }
 .panel { border: 1px solid #29303d; border-radius: 16px; background: linear-gradient(145deg, #141924, #0f131b); box-shadow: inset 0 1px #ffffff08, 0 18px 60px #00000022; }
@@ -102,11 +105,11 @@ main { max-width: 1540px; margin: auto; padding: clamp(20px, 3vw, 46px) clamp(16
 .legend-item b { color: #737e8f; font: 10px "Space Mono"; }
 .legend-empty { color: #737e8f; font-size: 12px; line-height: 1.5; }
 #map { min-width: 0; height: 100%; background: #10141b; }
-.school-map-marker { position: relative; width: 31px; height: 38px; padding: 0; border: 0; background: transparent; cursor: pointer; opacity: .38; filter: grayscale(.65); transition: opacity .2s, filter .2s, transform .2s; }
-.school-map-marker img { width: 100%; height: 100%; display: block; }
-.school-map-marker.active { width: 40px; height: 48px; opacity: 1; filter: drop-shadow(0 0 8px #a855f777); z-index: 2; }
-.school-map-marker:hover, .school-map-marker:focus-visible { opacity: 1; filter: none; transform: translateY(-3px) scale(1.08); outline: none; }
-.school-map-marker span { position: absolute; top: -5px; right: -8px; display: grid; place-items: center; min-width: 23px; height: 23px; padding: 0 5px; border: 2px solid #090b10; border-radius: 999px; color: #090b10; background: #f4f6fa; font: 700 10px "Space Mono"; box-shadow: 0 3px 12px #0009; }
+.school-map-marker { position: absolute; width: 22px; height: 28px; padding: 0; border: 0; background: transparent; cursor: pointer; opacity: .26; filter: grayscale(.72); transition: opacity .2s, filter .2s; }
+.school-map-marker .marker-glyph { display: block; width: 100%; height: 100%; background: var(--school-color); -webkit-mask: url("./assets/school-marker.svg") center / contain no-repeat; mask: url("./assets/school-marker.svg") center / contain no-repeat; filter: drop-shadow(0 0 5px var(--school-color)); }
+.school-map-marker.active { width: 32px; height: 39px; opacity: 1; filter: drop-shadow(0 0 8px #a855f777); z-index: 2; }
+.school-map-marker:hover, .school-map-marker:focus-visible { opacity: 1; filter: none; outline: 2px solid #f4f6fa; outline-offset: 2px; }
+.school-map-marker span { position: absolute; top: -5px; right: -8px; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px; border: 2px solid #090b10; border-radius: 999px; color: #090b10; background: #f4f6fa; font: 700 10px "Rajdhani"; box-shadow: 0 3px 12px #0009; }
 .maplibregl-popup-content { max-width: 330px; border: 1px solid #3a4252; border-radius: 12px; color: #f4f6fa; background: #11151df2; box-shadow: 0 18px 50px #0008; backdrop-filter: blur(10px); }
 .maplibregl-popup-tip { border-top-color: #11151d !important; }
 .school-popup p { margin: 0 0 7px; color: #22d3ee; font: 700 9px "Space Mono"; letter-spacing: .06em; }
@@ -116,6 +119,70 @@ main { max-width: 1540px; margin: auto; padding: clamp(20px, 3vw, 46px) clamp(16
 .maplibregl-ctrl-group { background: #171c26 !important; border: 1px solid #343b4b; }
 .maplibregl-ctrl-group button + button { border-color: #343b4b !important; }
 .maplibregl-ctrl button .maplibregl-ctrl-icon { filter: invert(1); }
+
+/* Tipografía institucional y controles del mapa corregido */
+body, button, input, .brand p, .eyebrow, .sync, .tab-count, .live-badge,
+.marks text, .big-progress strong, .big-progress span, .progress-pct,
+.target-control input, .metric-icon, .metric strong, .school-title > span,
+.table-head, .school-row summary > strong, .school-row summary > span:not(.school-name),
+.role-summary span b, .year-counts b, .loading, .legend-item b,
+.school-map-marker span, .school-popup p, .school-popup strong { font-family: "Rajdhani", system-ui, sans-serif; }
+
+.top-actions { display: flex; align-items: center; gap: 16px; }
+.logout { border: 1px solid #475166; border-radius: 9px; padding: 8px 13px; background: #171c26; font-size: 14px; font-weight: 600; cursor: pointer; }
+.logout:hover { border-color: #a855f7; background: #a855f719; }
+.tab { font-size: 16px; }
+.section-heading h2 { font-size: 23px; }
+.metric p { font-size: 15px; }
+.muted { font-size: 15px; line-height: 1.4; }
+.vessel-copy label { font-size: 14px; }
+.target-control input, .target-control button { font-size: 14px; }
+.school-name { font-size: 16px; }
+.school-row summary > strong, .school-row summary > span:not(.school-name) { font-size: 14px; }
+.table-head { font-size: 11px; }
+
+.map-stage { position: relative; min-width: 0; height: 100%; overflow: hidden; }
+.map-toolbar { position: absolute; z-index: 5; top: 14px; left: 14px; display: flex; flex-wrap: wrap; gap: 8px; padding: 7px; border: 1px solid #3a4354; border-radius: 12px; background: #0d1119e8; box-shadow: 0 8px 24px #0008; backdrop-filter: blur(10px); }
+.map-tool { border: 1px solid #3a4354; border-radius: 8px; padding: 8px 12px; color: #b7c0d0; background: #171c26; font-size: 14px; font-weight: 600; cursor: pointer; }
+.map-tool.active { border-color: #a855f7; color: #fff; background: #a855f72b; box-shadow: inset 0 0 0 1px #a855f733; }
+.map-status { position: absolute; z-index: 5; right: 14px; bottom: 28px; left: 14px; padding: 9px 13px; border: 1px solid #3a4354; border-radius: 9px; color: #d6dce7; background: #0d1119e8; font-size: 14px; font-weight: 600; line-height: 1.35; pointer-events: none; backdrop-filter: blur(9px); }
+.map-legend { font-size: 15px; }
+.map-legend h2 { font-size: 23px; }
+.legend-summary { font-size: 14px; }
+.filter-group { margin: 0 0 18px; padding: 0 0 13px; border-bottom: 1px solid #28303e; }
+.filter-group-title, .school-filter { display: grid; align-items: center; cursor: pointer; }
+.filter-group-title { grid-template-columns: 18px 22px 1fr; gap: 8px; margin-bottom: 8px; line-height: 1.25; }
+.filter-group-title input, .school-filter input { width: 16px; height: 16px; accent-color: #a855f7; }
+.shape { display: grid; place-items: center; color: #f4f6fa; font-size: 17px; }
+.shape.private { color: #f472b6; }
+.school-filter { grid-template-columns: 17px 9px 1fr auto; gap: 8px; padding: 7px 2px 7px 10px; color: #c3cad7; font-size: 14px; line-height: 1.25; }
+.school-filter:hover { color: #fff; background: #ffffff08; }
+.school-filter i { width: 8px; height: 8px; border-radius: 50%; background: var(--school-color, #919aac); box-shadow: 0 0 7px var(--school-color, #919aac); }
+.school-filter b { color: #e4e8ef; font-size: 13px; }
+.unknown-filter { margin-top: 6px; }
+
+.school-map-marker { color: var(--school-color); }
+.school-map-marker.private .marker-glyph { transform: rotate(4deg); }
+.school-map-marker.active { filter: drop-shadow(0 0 9px var(--school-color)); }
+.school-popup p { font-size: 11px; }
+.school-popup h3 { font-size: 17px; }
+.school-popup span { font-size: 14px; }
+.school-popup strong { font-size: 13px; }
+
+.auth-overlay { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 22px; background: radial-gradient(circle at 50% 15%, #2b1647, #090b10 62%); }
+.login-card { width: min(440px, 100%); padding: 34px; border: 1px solid #3a4354; border-radius: 20px; background: linear-gradient(145deg, #171d29, #0f131b); box-shadow: 0 30px 100px #000b; }
+.login-card > img { width: 54px; height: 64px; margin-bottom: 18px; }
+.login-card h2 { margin: 0 0 8px; font-size: 31px; }
+.login-card > p:not(.eyebrow):not(.login-error) { margin: 0 0 23px; color: #a8b1c1; font-size: 16px; line-height: 1.45; }
+.login-card label { display: grid; gap: 6px; margin: 14px 0; color: #c7cfdb; font-size: 15px; font-weight: 600; }
+.login-card .remember-option { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+.login-card .remember-option input { width: 17px; height: 17px; margin: 0; padding: 0; accent-color: #a855f7; }
+.login-card input { width: 100%; border: 1px solid #3a4354; border-radius: 9px; padding: 11px 12px; color: #fff; background: #090c12; font-size: 17px; outline: none; }
+.login-card input:focus { border-color: #a855f7; box-shadow: 0 0 0 3px #a855f720; }
+.login-card button { width: 100%; margin-top: 8px; border: 1px solid #a855f7; border-radius: 10px; padding: 11px; background: linear-gradient(100deg, #7c3aed, #a855f7); font-size: 17px; font-weight: 700; cursor: pointer; }
+.login-card button:disabled { opacity: .65; cursor: wait; }
+.login-error { min-height: 22px; margin: 4px 0; color: #fca5a5; font-size: 14px; font-weight: 600; }
+.auth-locked { overflow: hidden; }
 
 @media (max-width: 1100px) {
   .hero-grid { grid-template-columns: 1fr; }

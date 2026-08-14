@@ -4,6 +4,8 @@ export interface Env {
   LIMESURVEY_PASSWORD: string;
   LIMESURVEY_STUDENT_SURVEY_ID: string;
   DASHBOARD_ALLOWED_ORIGIN: string;
+  DASHBOARD_USERNAME: string;
+  DASHBOARD_PASSWORD: string;
 }
 
 export type RawResponse = Record<string, unknown>;
@@ -12,6 +14,7 @@ export interface NormalizedResponse {
   school: string;
   schoolKey: string;
   schoolNumber: number | null;
+  managementType: ManagementType;
   courseYear: number | null;
   complete: boolean;
   lat: number | null;
@@ -36,6 +39,7 @@ export interface RoleCounts extends Counts {
 export interface SchoolSummary extends Counts {
   school: string;
   schoolNumber: number | null;
+  managementType: ManagementType;
   roles: { student: RoleCounts };
 }
 
@@ -44,5 +48,14 @@ export interface DashboardPayload {
   surveyId: string;
   summary: Counts;
   schools: SchoolSummary[];
-  mapPoints: Array<{ school: string; lat: number; lon: number }>;
+  mapPoints: Array<{
+    school: string;
+    schoolNumber: number | null;
+    managementType: ManagementType;
+    complete: boolean;
+    lat: number;
+    lon: number;
+  }>;
 }
+
+export type ManagementType = "state" | "private" | "unknown";

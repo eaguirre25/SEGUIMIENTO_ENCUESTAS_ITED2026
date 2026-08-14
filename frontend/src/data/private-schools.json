@@ -1,0 +1,708 @@
+{
+  "type": "FeatureCollection",
+  "source": "Nivel secundario y modalidad técnico profesional · Gestión privada · General San Martín · 13-08-2026",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061126400",
+        "name": "INSTITUTO SAN JOAQUIN",
+        "cue": "061126400",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "SAN JUAN 4570",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.55005382858989,
+          -34.54866843240267
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060362500",
+        "name": "INSTITUTO SAN MARTÍN DE PORRES",
+        "cue": "060362500",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "236 1260",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.58500952786727,
+          -34.50466835486054
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060943900",
+        "name": "INSTITUTO EVANGÉLICO EL BUEN PASTOR",
+        "cue": "060943900",
+        "locality": "VILLA JUAN MARTIN DE PUEYRREDON",
+        "address": "123 - GENERAL MANUEL BELGRANO 3747",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.5657712747244,
+          -34.57436204347334
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060612700",
+        "name": "INSTITUTO JOSÉ HERNANDEZ",
+        "cue": "060612700",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "PROFESOR AGUER 5059",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.5588068069884,
+          -34.55047277100141
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061070900",
+        "name": "SAGRADO CORAZON",
+        "cue": "061070900",
+        "locality": "GENERAL SAN MARTIN",
+        "address": "DR.RAMON CARRILLO 2349",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.54027154129841,
+          -34.574209152430285
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061123600",
+        "name": "INSTITUTO SANTA ANA",
+        "cue": "061123600",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "BOULEVARD BALLESTER 4705",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.55156266628387,
+          -34.54860241406999
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060612400",
+        "name": "INSTITUTO BALLESTER",
+        "cue": "060612400",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "SAN MARTÍN 444",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.55939429990684,
+          -34.54870622371311
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060944300",
+        "name": "INSTITUTO AGUSTINIANO",
+        "cue": "060944300",
+        "locality": "SAN ANDRES",
+        "address": "SALGUERO 2778",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.54415620424527,
+          -34.57025927784326
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060162700",
+        "name": "ESCUELA HÖLTERS",
+        "cue": "060162700",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "INDEPENDENCIA 836",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.564445233479255,
+          -34.542862627834424
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060857100",
+        "name": "INSTITUTO MARIANO MORENO",
+        "cue": "060857100",
+        "locality": "GENERAL SAN MARTIN",
+        "address": "R. CARRILLO 2332",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.540424527606625,
+          -34.57447618046978
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060333100",
+        "name": "COLEGIO EYMARD",
+        "cue": "060333100",
+        "locality": "BARRIO PARQUE GENERAL SAN MARTIN",
+        "address": "JOSÉ C. PAZ 4801",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.553422156592056,
+          -34.578707087970784
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060578400",
+        "name": "NUESTRA SEÑORA DEL ROSARIO",
+        "cue": "060578400",
+        "locality": "GENERAL SAN MARTIN",
+        "address": "SAN CARLOS 4609",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.53621103781141,
+          -34.58911490175157
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060607400",
+        "name": "INSTITUTO NUESTRA SEÑORA DE LA MERCED",
+        "cue": "060607400",
+        "locality": "SAN ANDRES",
+        "address": "JUNÍN 2641",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.535677912205756,
+          -34.56509271225872
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060829700",
+        "name": "INSTITUTO SAN PIO X",
+        "cue": "060829700",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "136 5070",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.580285580714815,
+          -34.55927293040128
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060979500",
+        "name": "INSTITUTO CONCORDIA",
+        "cue": "060979500",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "LIBERTAD 7200",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.57000254717963,
+          -34.529777692586265
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060994500",
+        "name": "INSTITUTO REMEDIOS DE ESCALADA DE SAN MARTIN",
+        "cue": "060994500",
+        "locality": "BARRIO PARQUE GENERAL SAN MARTIN",
+        "address": "SOLDADO FOLCH 6527",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.58689216933458,
+          -34.5514567147449
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060980000",
+        "name": "COLEGIO ALMAFUERTE",
+        "cue": "060980000",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "EMILIO MITRE 8105",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.57272346491584,
+          -34.51928593359878
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060995800",
+        "name": "NUESTRA SEÑORA DE LUJAN DEL BUEN VIAJE",
+        "cue": "060995800",
+        "locality": "BARRIO PARQUE GENERAL SAN MARTIN",
+        "address": "RUTA 8 CALLE MARCONI 6725",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.59329821667153,
+          -34.56310904682128
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060940000",
+        "name": "INSTITUTO LA SALLE",
+        "cue": "060940000",
+        "locality": "BARRIO PARQUE GENERAL SAN MARTIN",
+        "address": "AVENIDA EVA PERÓN 3151",
+        "technical": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.561865386561585,
+          -34.57861028596526
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:060730600",
+        "name": "INSTITUTO HÖLTERS",
+        "cue": "060730600",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "INDEPENDENCIA 5886",
+        "technical": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.56462686223972,
+          -34.542777972825036
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061566700",
+        "name": "INSTITUTO SAN JOSE",
+        "cue": "061566700",
+        "locality": "VILLA MAIPU",
+        "address": "ESTRADA 2454",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.52464094608894,
+          -34.57064762672299
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061576000",
+        "name": "INSTITUTO MAIPU",
+        "cue": "061576000",
+        "locality": "GENERAL SAN MARTIN",
+        "address": "58 (PUEYRREDÓN) 3105",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.535378460214865,
+          -34.570657623266825
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061606400",
+        "name": "INSTITUTO ALFONSINA STORNI",
+        "cue": "061606400",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "BIARRITZ E/A. DEL VALLE Y A.STORNI 3349",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.57387364745074,
+          -34.54396713287673
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061623400",
+        "name": "INSTITUTO NUESTRA SEÑORA DEL LIBANO",
+        "cue": "061623400",
+        "locality": "VILLA LYNCH",
+        "address": "AV. 10 REP. DEL LIBANO Y MONTEAGUDO 4031",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.52528169629312,
+          -34.591605734317
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061703600",
+        "name": "HOGAR ESCUELA CRISTIANA F.E.",
+        "cue": "061703600",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "VICENTE LOPEZ 259",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.557856786561274,
+          -34.55372388764715
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061953400",
+        "name": "INSTITUTO EMILIO LAMARCA",
+        "cue": "061953400",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "CONGRESO 364",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.551134135731616,
+          -34.557947639072154
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061953500",
+        "name": "INSTITUTO JOSÉ MANUEL ESTRADA",
+        "cue": "061953500",
+        "locality": "GENERAL SAN MARTIN",
+        "address": "DARDO ROCHA E/ LINCOLN Y MORENO 1853",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.54114858533876,
+          -34.58375826453215
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061953600",
+        "name": "COLEGIO MARIA INMACULADA",
+        "cue": "061953600",
+        "locality": "GENERAL SAN MARTIN",
+        "address": "HONORIO SENET 2051",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.54811298292765,
+          -34.58595991461823
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061991400",
+        "name": "COLEGIO JOSÉ HERNANDEZ",
+        "cue": "061991400",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "PROF. AGUER 5036",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.558735433823855,
+          -34.550785710508016
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061991500",
+        "name": "COLEGIO LA SAGRADA FAMILIA",
+        "cue": "061991500",
+        "locality": "BILLINGHURST",
+        "address": "MORENO 133 4247",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.574061736996306,
+          -34.57459406620207
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061991600",
+        "name": "COLEGIO NUESTRA SEÑORA DE LUJAN",
+        "cue": "061991600",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "CHACABUCO 3662",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.56979282720994,
+          -34.55135658058703
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061992000",
+        "name": "INSTITUTO LIBERTAD",
+        "cue": "061992000",
+        "locality": "VILLA LIBERTAD",
+        "address": "INFANTA ISABEL 2444",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.56040051816312,
+          -34.58942873101257
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061992100",
+        "name": "CASA DEL SOL",
+        "cue": "061992100",
+        "locality": "VILLA LIBERTAD",
+        "address": "AV.TRIUNVIRATO 2677",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.56479330110275,
+          -34.58897359906918
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:062005900",
+        "name": "INSTITUTO PRIVADO DR. MANUEL BELGRANO",
+        "cue": "062005900",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "ITUZAINGO 2420",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.559383118353374,
+          -34.54146090605264
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:062030200",
+        "name": "TIERRA DE CRECIMIENTO",
+        "cue": "062030200",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "LACROZE 5665",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.56032054327453,
+          -34.5429617896228
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:062183100",
+        "name": "COLEGIO RUBEN DARIO",
+        "cue": "062183100",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "AMERICA 3576",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.54776016248697,
+          -34.5595027908313
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:062222700",
+        "name": "INSTITUTO NUESTRA SEÑORA DE LA MERCED",
+        "cue": "062222700",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "LAMADRID 2542",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.55657923933625,
+          -34.545633224661366
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:062243800",
+        "name": "INSTITUTO INCORPORADO SAN ANDRES",
+        "cue": "062243800",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "SAN JOSÉ DE FLORES 6039",
+        "technical": false
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.57516225903089,
+          -34.54891131320636
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolId": "private:061148200",
+        "name": "INSTITUTO SAN ANTONIO DE PADUA",
+        "cue": "061148200",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "CALLE 71 (EX PROF. AGUER) 7201",
+        "technical": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.5787485817815,
+          -34.53666518554974
+        ]
+      }
+    }
+  ]
+}

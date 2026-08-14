@@ -2,6 +2,7 @@ import { QUESTION_MAP } from "./question-map";
 import type {
   Counts,
   DashboardPayload,
+  ManagementType,
   NormalizedResponse,
   RawResponse,
   RoleCounts,
@@ -72,28 +73,46 @@ export function parseCoordinate(value: unknown, kind: "lat" | "lon"): number | n
 
 export function normalizeResponse(raw: RawResponse, map: QuestionMap): NormalizedResponse | null {
   if (!map.SCHOOL) throw new Error("Falta configurar QUESTION_MAP.SCHOOL en src/question-map.ts");
-  const management = map.MANAGEMENT_TYPE ? String(readMappedValue(raw, map.MANAGEMENT_TYPE) ?? "")
-    .trim().normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR") : "";
-  const stateSchoolValue = map.STATE_SCHOOL ? readMappedValue(raw, map.STATE_SCHOOL) : null;
-  const privateSchoolValue = map.PRIVATE_SCHOOL ? readMappedValue(raw, map.PRIVATE_SCHOOL) : null;
-  const isStateSchool = management === "estatal";
-  const schoolNumber = isStateSchool ? parseSchoolNumber(stateSchoolValue) : null;
-  const mappedSchoolValue = isStateSchool
-    ? (schoolNumber === null ? stateSchoolValue : `EES ${schoolNumber}`)
-    : management === "privada" ? privateSchoolValue : readMappedValue(raw, map.SCHOOL);
-  const school = normalizeSchool(mappedSchoolValue);
-  if (!school) return null;
+  const identity = identifySchool(raw, map);
+  if (!identity) return null;
+  const { school, schoolNumber, managementType } = identity;
   const lat = map.LATITUDE ? parseCoordinate(readMappedValue(raw, map.LATITUDE), "lat") : null;
   const lon = map.LONGITUDE ? parseCoordinate(readMappedValue(raw, map.LONGITUDE), "lon") : null;
   return {
     school: school.original,
     schoolKey: school.key,
     schoolNumber,
+    managementType,
     courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
     complete: detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
     lat,
     lon,
   };
+}
+
+function identifySchool(raw: RawResponse, map: QuestionMap): {
+  school: { original: string; key: string };
+  schoolNumber: number | null;
+  managementType: ManagementType;
+} | null {
+  const managementType = normalizeManagementType(map.MANAGEMENT_TYPE ? readMappedValue(raw, map.MANAGEMENT_TYPE) : null);
+  const stateSchoolValue = map.STATE_SCHOOL ? readMappedValue(raw, map.STATE_SCHOOL) : null;
+  const privateSchoolValue = map.PRIVATE_SCHOOL ? readMappedValue(raw, map.PRIVATE_SCHOOL) : null;
+  const isStateSchool = managementType === "state";
+  const schoolNumber = isStateSchool ? parseSchoolNumber(stateSchoolValue) : null;
+  const mappedSchoolValue = isStateSchool
+    ? (schoolNumber === null ? stateSchoolValue : `EES ${schoolNumber}`)
+    : managementType === "private" ? privateSchoolValue : (map.SCHOOL ? readMappedValue(raw, map.SCHOOL) : null);
+  const school = normalizeSchool(mappedSchoolValue);
+  if (!school) return null;
+  return { school, schoolNumber, managementType };
+}
+
+function normalizeManagementType(value: unknown): ManagementType {
+  const normalized = String(value ?? "").trim().normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR");
+  if (normalized === "estatal") return "state";
+  if (normalized === "privada") return "private";
+  return "unknown";
 }
 
 function readMappedValue(raw: RawResponse, fields: string | readonly string[]): unknown {
@@ -155,7 +174,13 @@ export function buildDashboard(
   for (const item of normalized) {
     let school = schools.get(item.schoolKey);
     if (!school) {
-      school = { school: item.school, schoolNumber: item.schoolNumber, ...emptyCounts(), roles: { student: createRole() } };
+      school = {
+        school: item.school,
+        schoolNumber: item.schoolNumber,
+        managementType: item.managementType,
+        ...emptyCounts(),
+        roles: { student: createRole() },
+      };
       schools.set(item.schoolKey, school);
     }
     add(school, item.complete);
@@ -167,6 +192,7 @@ export function buildDashboard(
     .map((school) => ({
       school: school.school,
       schoolNumber: school.schoolNumber,
+      managementType: school.managementType,
       ...finishCounts(school),
       roles: {
         student: {
@@ -187,7 +213,20 @@ export function buildDashboard(
     surveyId,
     summary: finishCounts(summary),
     schools: schoolList,
-    mapPoints: [],
+    mapPoints: rawResponses.flatMap((raw) => {
+      const lat = map.LATITUDE ? parseCoordinate(readMappedValue(raw, map.LATITUDE), "lat") : null;
+      const lon = map.LONGITUDE ? parseCoordinate(readMappedValue(raw, map.LONGITUDE), "lon") : null;
+      if (lat === null || lon === null) return [];
+      const identity = identifySchool(raw, map);
+      return [{
+        school: identity?.school.original ?? "Sin escuela identificada",
+        schoolNumber: identity?.schoolNumber ?? null,
+        managementType: identity?.managementType ?? "unknown",
+        complete: detectCompletion(raw, completionField),
+        lat,
+        lon,
+      }];
+    }),
   };
 }
 
