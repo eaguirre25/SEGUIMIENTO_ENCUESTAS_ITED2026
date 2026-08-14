@@ -125,6 +125,12 @@ app.innerHTML = `
       <button type="submit">Ingresar</button>
     </form>
   </div>
+  <dialog id="school-modal" class="school-modal" aria-labelledby="school-modal-title">
+    <div class="school-modal-shell">
+      <button id="school-modal-close" class="school-modal-close" type="button" aria-label="Cerrar detalle">×</button>
+      <div id="school-modal-content"></div>
+    </div>
+  </dialog>
 `;
 
 app.querySelectorAll<HTMLButtonElement>(".tab").forEach((button) => {
@@ -135,6 +141,10 @@ document.querySelector<HTMLButtonElement>("#logout")?.addEventListener("click", 
 document.querySelector<HTMLButtonElement>("#points-mode")?.addEventListener("click", () => setMapMode("points"));
 document.querySelector<HTMLButtonElement>("#heatmap-mode")?.addEventListener("click", () => setMapMode("heatmap"));
 document.querySelector<HTMLButtonElement>("#threads-toggle")?.addEventListener("click", toggleThreads);
+document.querySelector<HTMLButtonElement>("#school-modal-close")?.addEventListener("click", closeSchoolModal);
+document.querySelector<HTMLDialogElement>("#school-modal")?.addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) closeSchoolModal();
+});
 
 void refresh();
 setInterval(() => void refresh(), REFRESH_MS);
@@ -290,6 +300,10 @@ function render(): void {
     </section>
   `;
   tracking.querySelector<HTMLButtonElement>("#save-target")?.addEventListener("click", saveTarget);
+  tracking.querySelectorAll<HTMLButtonElement>(".school-summary").forEach((button) => button.addEventListener("click", () => {
+    const id = button.dataset.schoolId;
+    if (id) openSchoolModal(id);
+  }));
   document.querySelector<HTMLElement>("#map-count")!.textContent = String(data.mapPoints.length);
   renderLegend();
   renderMapStatus();
@@ -322,13 +336,40 @@ function metric(label: string, value: string | number, color: string, icon: stri
 
 function schoolRow(school: SchoolSummary): string {
   const name = escapeHtml(schoolDisplayName(school));
-  return `<details class="school-row">
-    <summary><span class="school-name"><i style="--school-color:${colorFor(school.school)}"></i>${name}</span><strong>${school.total}</strong><span class="complete">${school.complete}</span><span class="incomplete">${school.incomplete}</span><span class="pct"><b>${formatPct(school.completePct)}</b><i><em style="width:${school.completePct}%"></em></i></span><span class="chevron">⌄</span></summary>
-    <div class="school-detail">
-      <div class="role-summary"><div><p class="eyebrow">ROL ACTIVO</p><h3>Estudiantes</h3></div><div><span>Total <b>${school.roles.student.total}</b></span><span>Completas <b>${school.roles.student.complete}</b></span><span>Incompletas <b>${school.roles.student.incomplete}</b></span></div></div>
-      <div class="years">${Object.values(school.roles.student.years).map((year) => `<div class="year"><div><strong>${year.year}.º año</strong><span>${year.total} respuestas</span></div><div class="microbar"><i style="width:${year.completePct}%"></i></div><div class="year-counts"><span>${year.complete} completas</span><span>${year.incomplete} incompletas</span><b>${formatPct(year.completePct)}</b></div></div>`).join("")}</div>
-    </div>
-  </details>`;
+  const id = escapeHtml(schoolIdForSummary(school));
+  return `<div class="school-row">
+    <button type="button" class="school-summary" data-school-id="${id}"><span class="school-name"><i style="--school-color:${colorFor(school.school)}"></i>${name}</span><strong>${school.total}</strong><span class="complete">${school.complete}</span><span class="incomplete">${school.incomplete}</span><span class="pct"><b>${formatPct(school.completePct)}</b><i><em style="width:${school.completePct}%"></em></i></span><span class="chevron" aria-hidden="true">↗</span></button>
+  </div>`;
+}
+
+function openSchoolModal(schoolId: string): void {
+  const school = data?.schools.find((candidate) => schoolIdForSummary(candidate) === schoolId);
+  const dialog = document.querySelector<HTMLDialogElement>("#school-modal");
+  const content = document.querySelector<HTMLElement>("#school-modal-content");
+  if (!school || !dialog || !content) return;
+  const name = escapeHtml(schoolDisplayName(school));
+  content.innerHTML = `
+    <header class="modal-school-header">
+      <div><p class="eyebrow">DETALLE DE LA ESCUELA</p><h2 id="school-modal-title"><i style="--school-color:${colorFor(school.school)}"></i>${name}</h2><p>Estudiantes · seguimiento de respuestas por año</p></div>
+      <div class="modal-school-total"><span>Total</span><strong>${school.total}</strong></div>
+    </header>
+    <section class="modal-stats" aria-label="Resumen de respuestas">
+      <article><span>Completas</span><strong class="complete">${school.complete}</strong></article>
+      <article><span>Incompletas</span><strong class="incomplete">${school.incomplete}</strong></article>
+      <article><span>Completitud</span><strong>${formatPct(school.completePct)}</strong></article>
+    </section>
+    <section class="modal-years">${Object.values(school.roles.student.years).map((year) => `
+      <article class="modal-year">
+        <div class="modal-year-heading"><strong>${year.year}.º año</strong><span>${year.total} respuestas</span></div>
+        <div class="modal-year-bar"><i style="width:${year.completePct}%"></i></div>
+        <div class="modal-year-counts"><span><b class="complete">${year.complete}</b> completas</span><span><b class="incomplete">${year.incomplete}</b> incompletas</span></div>
+        <strong class="modal-year-pct">${formatPct(year.completePct)}</strong>
+      </article>`).join("")}</section>`;
+  dialog.showModal();
+}
+
+function closeSchoolModal(): void {
+  document.querySelector<HTMLDialogElement>("#school-modal")?.close();
 }
 
 function switchTab(tab: "tracking" | "map"): void {
