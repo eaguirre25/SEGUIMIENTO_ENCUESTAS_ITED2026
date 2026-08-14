@@ -1,9 +1,12 @@
 import { LimeSurveyClient } from "./limesurvey";
 import { buildDashboard } from "./normalize";
-import type { DashboardPayload, Env } from "./types";
+import { QUESTION_MAP } from "./question-map";
+import type { Env } from "./types";
 
-const CACHE_MS = 20_000;
-let memoryCache: { expiresAt: number; surveyId: string; payload: DashboardPayload } | null = null;
+const CACHE_ROW_ID = 1;
+const DASHBOARD_EXPORT_FIELDS = [...new Set(Object.values(QUESTION_MAP).flatMap((value) =>
+  value === null ? [] : typeof value === "string" ? [value] : [...value],
+))];
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -22,27 +25,54 @@ export default {
     try {
       assertEnv(env);
       if (!(await isAuthorized(request, env))) return unauthorized(cors);
-      const surveyId = env.LIMESURVEY_STUDENT_SURVEY_ID;
-      const now = Date.now();
-      if (memoryCache && memoryCache.surveyId === surveyId && memoryCache.expiresAt > now) {
-        return json(memoryCache.payload, 200, cors, "HIT");
+      const forceRefresh = url.searchParams.get("refresh") === "1";
+      if (!forceRefresh) {
+        const cached = await readCachedDashboard(env);
+        if (cached) return jsonText(cached, 200, cors, "D1");
       }
-      const client = new LimeSurveyClient(
-        env.LIMESURVEY_RPC_URL,
-        env.LIMESURVEY_USERNAME,
-        env.LIMESURVEY_PASSWORD,
-      );
-      const raw = await client.exportAllResponses(Number(surveyId));
-      const payload = buildDashboard(raw, surveyId);
-      memoryCache = { expiresAt: now + CACHE_MS, surveyId, payload };
-      return json(payload, 200, cors, "MISS");
+      const fresh = await refreshDashboard(env);
+      return jsonText(fresh, 200, cors, forceRefresh ? "REFRESH" : "SEED");
     } catch (error) {
-      console.error("Dashboard API error", error);
+      console.error(JSON.stringify({ message: "dashboard request failed", error: errorMessage(error) }));
       const message = error instanceof Error ? error.message : "Error inesperado";
       return jsonError(message, 502, cors);
     }
   },
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(refreshDashboard(env).then(
+      () => console.log(JSON.stringify({ message: "dashboard cache refreshed" })),
+      (error) => console.error(JSON.stringify({ message: "dashboard refresh failed", error: errorMessage(error) })),
+    ));
+  },
 } satisfies ExportedHandler<Env>;
+
+async function readCachedDashboard(env: Env): Promise<string | null> {
+  const row = await env.DASHBOARD_DB.prepare(
+    "SELECT payload FROM dashboard_cache WHERE id = ?1",
+  ).bind(CACHE_ROW_ID).first<{ payload: string }>();
+  return row?.payload ?? null;
+}
+
+async function refreshDashboard(env: Env): Promise<string> {
+  const surveyId = env.LIMESURVEY_STUDENT_SURVEY_ID;
+  const client = new LimeSurveyClient(
+    env.LIMESURVEY_RPC_URL,
+    env.LIMESURVEY_USERNAME,
+    env.LIMESURVEY_PASSWORD,
+  );
+  const raw = await client.exportAllResponses(Number(surveyId), DASHBOARD_EXPORT_FIELDS);
+  const serialized = JSON.stringify(buildDashboard(raw, surveyId));
+  await env.DASHBOARD_DB.prepare(`
+    INSERT INTO dashboard_cache (id, payload, updated_at)
+    VALUES (?1, ?2, datetime('now'))
+    ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at
+  `).bind(CACHE_ROW_ID, serialized).run();
+  return serialized;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 function assertEnv(env: Env): void {
   const required: Array<keyof Env> = [
@@ -53,6 +83,7 @@ function assertEnv(env: Env): void {
     "DASHBOARD_ALLOWED_ORIGIN",
     "DASHBOARD_USERNAME",
     "DASHBOARD_PASSWORD",
+    "DASHBOARD_DB",
   ];
   const missing = required.filter((key) => !env[key]);
   if (missing.length) throw new Error(`Falta configuración requerida: ${missing.join(", ")}`);
@@ -81,11 +112,15 @@ function isLocalhost(value: string): boolean {
 }
 
 function json(payload: unknown, status: number, cors?: Headers, cache = "BYPASS"): Response {
+  return jsonText(JSON.stringify(payload), status, cors, cache);
+}
+
+function jsonText(payload: string, status: number, cors?: Headers, cache = "BYPASS"): Response {
   const headers = cors ?? new Headers();
   headers.set("content-type", "application/json; charset=utf-8");
   headers.set("cache-control", "private, no-store");
   headers.set("X-Dashboard-Cache", cache);
-  return new Response(JSON.stringify(payload), { status, headers });
+  return new Response(payload, { status, headers });
 }
 
 function jsonError(message: string, status: number, cors?: Headers): Response {

@@ -28,7 +28,7 @@ export class LimeSurveyClient {
     return envelope.result;
   }
 
-  async exportAllResponses(surveyId: number): Promise<RawResponse[]> {
+  async exportAllResponses(surveyId: number, fields?: readonly string[]): Promise<RawResponse[]> {
     let sessionKey: string | null = null;
     try {
       const sessionResult = await this.call<unknown>("get_session_key", [this.username, this.password]);
@@ -44,6 +44,9 @@ export class LimeSurveyClient {
         "all",
         "code",
         "long",
+        null,
+        null,
+        fields ? [...fields] : null,
       ]);
       if (typeof exportResult !== "string") {
         throw new Error(`LimeSurvey no pudo exportar respuestas: ${rpcStatus(exportResult)}`);
@@ -70,7 +73,9 @@ function rpcStatus(value: unknown): string {
 export function decodeExport(encoded: string): RawResponse[] {
   let text: string;
   try {
-    const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+    const binary = atob(encoded);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
     text = new TextDecoder().decode(bytes);
   } catch {
     text = encoded;

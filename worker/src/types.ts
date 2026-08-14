@@ -6,6 +6,7 @@ export interface Env {
   DASHBOARD_ALLOWED_ORIGIN: string;
   DASHBOARD_USERNAME: string;
   DASHBOARD_PASSWORD: string;
+  DASHBOARD_DB: D1Database;
 }
 
 export type RawResponse = Record<string, unknown>;

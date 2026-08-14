@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildDashboard, detectCompletion, normalizeSchool, parseCourseYear, parseSchoolNumber, splitTimestamp } from "../src/normalize";
-import { decodeExport } from "../src/limesurvey";
+import { decodeExport, LimeSurveyClient } from "../src/limesurvey";
 import { QUESTION_MAP } from "../src/question-map";
 import type { QuestionMap } from "../src/normalize";
 
@@ -88,6 +88,27 @@ describe("normalización", () => {
   it("extrae únicamente cursos 1 a 7", () => {
     expect(parseCourseYear("3.º año")).toBe(3);
     expect(parseCourseYear("8")).toBeNull();
+  });
+
+  it("pide a LimeSurvey únicamente los campos necesarios", async () => {
+    const calls: Array<{ method: string; params: unknown[] }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => {
+      const request = JSON.parse(String(init.body)) as { id: number; method: string; params: unknown[] };
+      calls.push(request);
+      const result = request.method === "get_session_key"
+        ? "session-key"
+        : request.method === "export_responses"
+          ? btoa(JSON.stringify({ responses: [] }))
+          : "OK";
+      return Response.json({ id: request.id, result });
+    }));
+    try {
+      const client = new LimeSurveyClient("https://example.invalid/rpc", "user", "password");
+      await client.exportAllResponses(977929, ["submitdate", "Q996548"]);
+      expect(calls[1].params.slice(7)).toEqual([null, null, ["submitdate", "Q996548"]]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("separa fecha y hora sin convertir la zona horaria de LimeSurvey", () => {

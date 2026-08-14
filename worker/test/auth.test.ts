@@ -10,6 +10,7 @@ const env: Env = {
   DASHBOARD_ALLOWED_ORIGIN: "https://example.github.io",
   DASHBOARD_USERNAME: "viewer",
   DASHBOARD_PASSWORD: "strong-password",
+  DASHBOARD_DB: {} as D1Database,
 };
 
 describe("protección del dashboard", () => {

@@ -4,6 +4,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-08-01",
   "observability": { "enabled": true },
+  "triggers": { "crons": ["* * * * *"] },
   "vars": {
     "LIMESURVEY_STUDENT_SURVEY_ID": "977929",
     "DASHBOARD_ALLOWED_ORIGIN": "http://localhost:5173"
@@ -11,6 +12,13 @@
   "env": {
     "production": {
       "name": "limesurvey-dashboard-api-production",
+      "d1_databases": [
+        {
+          "binding": "DASHBOARD_DB",
+          "database_name": "limesurvey-dashboard-cache",
+          "database_id": "74c9825b-e50e-430c-bc75-0efdb7ea5b81"
+        }
+      ],
       "vars": {
         "LIMESURVEY_STUDENT_SURVEY_ID": "977929",
         "DASHBOARD_ALLOWED_ORIGIN": "https://eaguirre25.github.io"
