@@ -202,9 +202,9 @@ Las variables que empiezan por `VITE_` son públicas por diseño; nunca colocar 
 
 ## Contrato y privacidad
 
-`GET /api/dashboard` exige autenticación y solo entrega fecha de generación, ID de encuesta, agregados, escuela, tipo de gestión, estado de completitud y coordenadas mínimas necesarias para el mapa. No devuelve ID individual, domicilio, edad, género, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela cuentan en el total general y, si tienen coordenadas válidas, aparecen como “sin escuela identificada”.
+`GET /api/dashboard` exige autenticación y solo entrega fecha de generación, ID de encuesta y agregados por escuela y tipo de gestión. No devuelve coordenadas individuales, ID individual, domicilio, edad, género, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela continúan contando en el total general, pero no aparecen como establecimientos en el mapa.
 
-El mapa diferencia dos objetos: el punto de matrícula proviene de la coordenada informada en la respuesta; el ícono de escuela proviene de las capas institucionales. Los hilos unen ambos sin reemplazar ninguna coordenada. La matrícula estatal se representa con círculos, la privada con triángulos y puede verse como puntos o mapa de calor. El contador concilia explícitamente respuestas totales con puntos dibujables y respuestas sin coordenadas.
+El mapa muestra exclusivamente establecimientos con encuestas aplicadas y ubicación institucional comprobada. Cada escuela se representa con un ícono de edificio y el mapa de calor pondera la cantidad agregada de respuestas del establecimiento.
 
 El nombre se normaliza con `trim`, espacios consecutivos y una clave en minúsculas. Se conserva como etiqueta la primera variante limpia observada. No se hace fuzzy matching.
 
