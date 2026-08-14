@@ -1,12 +1,9 @@
 import { LimeSurveyClient } from "./limesurvey";
 import { buildDashboard } from "./normalize";
-import { QUESTION_MAP } from "./question-map";
+import { DASHBOARD_EXPORT_FIELDS } from "./question-map";
 import type { Env } from "./types";
 
 const CACHE_ROW_ID = 1;
-const DASHBOARD_EXPORT_FIELDS = [...new Set(Object.values(QUESTION_MAP).flatMap((value) =>
-  value === null ? [] : typeof value === "string" ? [value] : [...value],
-))];
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

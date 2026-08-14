@@ -15,3 +15,20 @@ export const QUESTION_MAP = {
   LOAD_TIMESTAMP: ["startdate", "datestamp", "submitdate"],
   MANAGEMENT_TYPE: "Q996591",
 } as const satisfies Record<string, string | readonly string[] | null>;
+
+/**
+ * Nombres internos verificados con get_fieldmap. LimeSurvey exige estos nombres
+ * de base de datos en aFields, aunque luego exporte encabezados con QCodes.
+ */
+export const DASHBOARD_EXPORT_FIELDS = [
+  "submitdate",
+  "startdate",
+  "datestamp",
+  "977929X336X3233",
+  "977929X336X3258",
+  "977929X336X3259",
+  "977929X336X3191",
+  "977929X336X3238",
+  "977929X337X3250SQ002",
+  "977929X337X3250SQ003",
+] as const;

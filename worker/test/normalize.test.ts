@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildDashboard, detectCompletion, normalizeSchool, parseCourseYear, parseSchoolNumber, splitTimestamp } from "../src/normalize";
 import { decodeExport, LimeSurveyClient } from "../src/limesurvey";
-import { QUESTION_MAP } from "../src/question-map";
+import { DASHBOARD_EXPORT_FIELDS, QUESTION_MAP } from "../src/question-map";
 import type { QuestionMap } from "../src/normalize";
 
 const map: QuestionMap = {
@@ -22,6 +22,8 @@ describe("normalización", () => {
     expect(QUESTION_MAP.SCHOOL).not.toContain(QUESTION_MAP.MANAGEMENT_TYPE);
     expect(QUESTION_MAP.STATE_SCHOOL).toBe("Q996548");
     expect(QUESTION_MAP.PRIVATE_SCHOOL).toBe("Q996592");
+    expect(DASHBOARD_EXPORT_FIELDS).toContain("977929X336X3191");
+    expect(DASHBOARD_EXPORT_FIELDS).toContain("977929X337X3250SQ003");
   });
 
   it("decodifica la estructura JSON exportada sin asumir QCodes", () => {
