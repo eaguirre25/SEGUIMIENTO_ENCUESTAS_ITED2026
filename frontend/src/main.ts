@@ -342,7 +342,7 @@ function render(): void {
             <p class="big-progress"><strong>${formatNumber(data.summary.total)}</strong><span>/ ${formatNumber(target)}</span></p>
             <p class="progress-pct">${formatPct((data.summary.total / target) * 100)}</p>
             <p class="muted">respuestas capturadas · incluye completas e incompletas</p>
-            <label for="target">Meta operativa</label>
+            <label for="target">Cantidad deseada de encuestas</label>
             <div class="target-control"><input id="target" type="number" min="1" step="50" value="${target}"><button id="save-target">Aplicar</button></div>
           </div>
         </div>
