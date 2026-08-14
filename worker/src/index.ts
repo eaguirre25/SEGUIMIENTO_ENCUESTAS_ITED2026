@@ -87,4 +87,3 @@ function json(payload: unknown, status: number, cors?: Headers, cache = "BYPASS"
 function jsonError(message: string, status: number, cors?: Headers): Response {
   return json({ error: message }, status, cors);
 }
-

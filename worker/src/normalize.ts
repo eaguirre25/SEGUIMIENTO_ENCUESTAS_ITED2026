@@ -8,7 +8,7 @@ import type {
   SchoolSummary,
 } from "./types";
 
-export type QuestionMap = Record<keyof typeof QUESTION_MAP, string | null>;
+export type QuestionMap = Record<keyof typeof QUESTION_MAP, string | readonly string[] | null>;
 
 export function normalizeSchool(value: unknown): { original: string; key: string } | null {
   if (typeof value !== "string") return null;
@@ -45,18 +45,31 @@ export function parseCoordinate(value: unknown, kind: "lat" | "lon"): number | n
 
 export function normalizeResponse(raw: RawResponse, map: QuestionMap): NormalizedResponse | null {
   if (!map.SCHOOL) throw new Error("Falta configurar QUESTION_MAP.SCHOOL en src/question-map.ts");
-  const school = normalizeSchool(raw[map.SCHOOL]);
+  const school = normalizeSchool(readMappedValue(raw, map.SCHOOL));
   if (!school) return null;
-  const lat = map.LATITUDE ? parseCoordinate(raw[map.LATITUDE], "lat") : null;
-  const lon = map.LONGITUDE ? parseCoordinate(raw[map.LONGITUDE], "lon") : null;
+  const lat = map.LATITUDE ? parseCoordinate(readMappedValue(raw, map.LATITUDE), "lat") : null;
+  const lon = map.LONGITUDE ? parseCoordinate(readMappedValue(raw, map.LONGITUDE), "lon") : null;
   return {
     school: school.original,
     schoolKey: school.key,
-    courseYear: map.COURSE_YEAR ? parseCourseYear(raw[map.COURSE_YEAR]) : null,
-    complete: detectCompletion(raw, map.COMPLETION ?? "submitdate"),
+    courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
+    complete: detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
     lat,
     lon,
   };
+}
+
+function readMappedValue(raw: RawResponse, fields: string | readonly string[]): unknown {
+  for (const field of typeof fields === "string" ? [fields] : fields) {
+    const value = raw[field];
+    if (value !== null && value !== undefined && String(value).trim() !== "") return value;
+  }
+  return null;
+}
+
+function firstField(fields: string | readonly string[] | null): string | null {
+  if (!fields) return null;
+  return typeof fields === "string" ? fields : fields[0] ?? null;
 }
 
 function emptyCounts(): Counts {
@@ -99,7 +112,8 @@ export function buildDashboard(
   const summary = emptyCounts();
   const schools = new Map<string, SchoolSummary>();
 
-  for (const raw of rawResponses) add(summary, detectCompletion(raw, map.COMPLETION ?? "submitdate"));
+  const completionField = firstField(map.COMPLETION) ?? "submitdate";
+  for (const raw of rawResponses) add(summary, detectCompletion(raw, completionField));
 
   for (const item of normalized) {
     let school = schools.get(item.schoolKey);

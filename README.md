@@ -14,6 +14,11 @@ LimeSurvey Cloud
 
 El Worker abre una sesión, exporta respuestas completas e incompletas con `export_responses` y libera la session key en un bloque `finally`. El navegador nunca se conecta a LimeSurvey.
 
+Producción:
+
+- Visor: `https://eaguirre25.github.io/SEGUIMIENTO_ENCUESTAS_ITED2026/`
+- API: `https://limesurvey-dashboard-api-production.limesurvey-dashboard-worker.workers.dev/api/dashboard`
+
 ## Estructura
 
 ```text
@@ -32,17 +37,18 @@ worker/
 .github/workflows/         CI y despliegues automáticos
 ```
 
-## Requisito pendiente: QCodes reales
+## QCodes de la encuesta de estudiantes
 
-No se recibieron una exportación CSV/JSON ni la estructura de preguntas, por lo que **no se inventaron códigos internos**. Antes de usar datos reales, abrir [`worker/src/question-map.ts`](worker/src/question-map.ts) y completar:
+Los códigos se verificaron contra RemoteControl 2 y están centralizados en [`worker/src/question-map.ts`](worker/src/question-map.ts):
 
-- `SCHOOL`: nombre de escuela; es el único campo obligatorio para agrupar.
-- `COURSE_YEAR`: curso/año.
-- `LATITUDE` y `LONGITUDE`: coordenadas.
-- `COMPLETION`: queda inicialmente en `submitdate`, metadato estándar de la exportación.
-- `SCHOOL_IDENTIFIER` y `MANAGEMENT_TYPE`: reservados; no se exponen en esta etapa.
+- `SCHOOL`: `Q996591`, `Q996592` o `Q996548`, según la rama respondida.
+- `SCHOOL_IDENTIFIER`: `Q996545` (reservado; todavía no agrupa ni se expone).
+- `COURSE_YEAR`: `Q449329`.
+- `LATITUDE`: `Q996543[SQ002]`.
+- `LONGITUDE`: `Q996543[SQ003]`.
+- `COMPLETION`: metadato estándar `submitdate`.
 
-El valor de cada propiedad debe ser exactamente el encabezado/QCode que aparece en la exportación. El Worker falla con un mensaje explícito mientras `SCHOOL` siga sin configurar. El ID inicial `977929` sí está en `worker/wrangler.jsonc` como variable no sensible y puede cambiarse allí.
+El ID `977929` está en `worker/wrangler.jsonc` como variable no sensible. Si cambia la encuesta, hay que volver a verificar estos códigos antes de desplegar.
 
 ## Desarrollo rápido sin datos reales
 

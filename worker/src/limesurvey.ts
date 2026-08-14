@@ -43,7 +43,7 @@ export class LimeSurveyClient {
         null,
         "all",
         "code",
-        "short",
+        "long",
       ]);
       if (typeof exportResult !== "string") {
         throw new Error(`LimeSurvey no pudo exportar respuestas: ${rpcStatus(exportResult)}`);
@@ -59,6 +59,7 @@ export class LimeSurveyClient {
       }
     }
   }
+
 }
 
 function rpcStatus(value: unknown): string {

@@ -44,4 +44,3 @@ export interface DashboardPayload {
   schools: SchoolSummary[];
   mapPoints: Array<{ school: string; lat: number; lon: number }>;
 }
-

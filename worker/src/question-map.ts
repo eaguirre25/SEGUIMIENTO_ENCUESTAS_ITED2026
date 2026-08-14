@@ -1,15 +1,14 @@
 /**
  * Único archivo que debe adaptarse a los nombres reales de la exportación.
- * No se inventan QCodes: complete usa el metadato estándar `submitdate`.
- * Complete los valores null luego de inspeccionar una exportación JSON/CSV real.
+ * QCodes verificados mediante `list_questions`, `get_fieldmap` y los encabezados
+ * de `export_responses` de la encuesta 977929 el 2026-08-13.
  */
 export const QUESTION_MAP = {
-  SCHOOL: null,
-  SCHOOL_IDENTIFIER: null,
-  COURSE_YEAR: null,
-  LATITUDE: null,
-  LONGITUDE: null,
+  SCHOOL: ["Q996591", "Q996592", "Q996548"],
+  SCHOOL_IDENTIFIER: "Q996545",
+  COURSE_YEAR: "Q449329",
+  LATITUDE: "Q996543[SQ002]",
+  LONGITUDE: "Q996543[SQ003]",
   COMPLETION: "submitdate",
   MANAGEMENT_TYPE: null,
-} as const satisfies Record<string, string | null>;
-
+} as const satisfies Record<string, string | readonly string[] | null>;

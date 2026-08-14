@@ -24,6 +24,16 @@ describe("normalización", () => {
     expect(normalizeSchool("ees 1")?.key).toBe("ees 1");
   });
 
+  it("toma la primera rama de escuela informada", () => {
+    const branchedMap: QuestionMap = { ...map, SCHOOL: ["school_choice", "school_other"] };
+    const result = buildDashboard(
+      [{ school_choice: "", school_other: "EES 26", year: 2, submitdate: null }],
+      "977929",
+      branchedMap,
+    );
+    expect(result.schools[0].school).toBe("EES 26");
+  });
+
   it("detecta respuestas completas e incompletas", () => {
     expect(detectCompletion({ submitdate: "2026-08-12 10:00:00" })).toBe(true);
     expect(detectCompletion({ submitdate: null })).toBe(false);
