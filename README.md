@@ -41,7 +41,8 @@ worker/
 
 Los códigos se verificaron contra RemoteControl 2 y están centralizados en [`worker/src/question-map.ts`](worker/src/question-map.ts):
 
-- `SCHOOL`: `Q996591`, `Q996592` o `Q996548`, según la rama respondida.
+- `SCHOOL`: `Q996592` o `Q996548`, según la rama respondida.
+- `MANAGEMENT_TYPE`: `Q996591` (`Estatal`/`Privada`); no se usa como nombre de escuela.
 - `SCHOOL_IDENTIFIER`: `Q996545` (reservado; todavía no agrupa ni se expone).
 - `COURSE_YEAR`: `Q449329`.
 - `LATITUDE`: `Q996543[SQ002]`.

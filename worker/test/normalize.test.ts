@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildDashboard, detectCompletion, normalizeSchool, parseCourseYear } from "../src/normalize";
 import { decodeExport } from "../src/limesurvey";
+import { QUESTION_MAP } from "../src/question-map";
 import type { QuestionMap } from "../src/normalize";
 
 const map: QuestionMap = {
@@ -14,6 +15,12 @@ const map: QuestionMap = {
 };
 
 describe("normalización", () => {
+  it("separa nombre de escuela y tipo de gestión según la exportación XLSX", () => {
+    expect(QUESTION_MAP.SCHOOL).toEqual(["Q996592", "Q996548"]);
+    expect(QUESTION_MAP.MANAGEMENT_TYPE).toBe("Q996591");
+    expect(QUESTION_MAP.SCHOOL).not.toContain(QUESTION_MAP.MANAGEMENT_TYPE);
+  });
+
   it("decodifica la estructura JSON exportada sin asumir QCodes", () => {
     const encoded = btoa(JSON.stringify({ responses: [{ "17": { school: "EES 1", submitdate: null } }] }));
     expect(decodeExport(encoded)).toEqual([{ school: "EES 1", submitdate: null }]);
@@ -22,6 +29,15 @@ describe("normalización", () => {
   it("normaliza espacios y mayúsculas sin perder el original limpio", () => {
     expect(normalizeSchool("  EES   1 ")).toEqual({ original: "EES 1", key: "ees 1" });
     expect(normalizeSchool("ees 1")?.key).toBe("ees 1");
+  });
+
+  it("consolida variantes inequívocas de escuelas numeradas", () => {
+    for (const variant of ["4", "EES4", "Media 4", "N°4", "Secundaria 4 Ricardo Rojas", "Escuela Número 4 Ricardo Rojas"]) {
+      expect(normalizeSchool(variant)?.original).toBe("EES 4");
+    }
+    expect(normalizeSchool("ees26")?.original).toBe("EES 26");
+    expect(normalizeSchool("Ee27")?.original).toBe("EES 27");
+    expect(normalizeSchool("Santa Ana")?.original).toBe("Santa Ana");
   });
 
   it("toma la primera rama de escuela informada", () => {

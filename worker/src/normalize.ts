@@ -12,12 +12,30 @@ export type QuestionMap = Record<keyof typeof QUESTION_MAP, string | readonly st
 
 export function normalizeSchool(value: unknown): { original: string; key: string } | null {
   if (typeof value !== "string") return null;
-  const original = value.trim().replace(/\s+/g, " ");
+  const cleaned = value.trim().replace(/\s+/g, " ");
+  const original = canonicalSchoolLabel(cleaned);
   if (!original) return null;
   return {
     original,
     key: original.normalize("NFKC").toLocaleLowerCase("es-AR"),
   };
+}
+
+function canonicalSchoolLabel(value: string): string {
+  if (!value) return value;
+  const folded = value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLocaleLowerCase("es-AR")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  const numberMatch = folded.match(/\d+/g);
+  if (!numberMatch || numberMatch.length !== 1) return value;
+  const number = String(Number(numberMatch[0]));
+  if (!["1", "4", "6", "26", "27"].includes(number)) return value;
+  const onlyNumber = folded === numberMatch[0];
+  const schoolMarker = new RegExp(`(?:^| )(?:ees|ee|es|n|numero|escuela|secundaria|media|md) *0*${number}(?: |$)`).test(folded);
+  return onlyNumber || schoolMarker ? `EES ${number}` : value;
 }
 
 export function detectCompletion(raw: RawResponse, field = "submitdate"): boolean {
