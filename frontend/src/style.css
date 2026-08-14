@@ -10,6 +10,7 @@ button, input { font: inherit; }
 button { color: inherit; }
 .topbar { min-height: 86px; padding: 18px clamp(20px, 4vw, 64px); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #242936; background: #090b10cc; backdrop-filter: blur(14px); }
 .brand { display: flex; align-items: center; gap: 14px; }
+.header-logo { width: 62px; height: 62px; margin-left: 8px; border: 1px solid #67d9f355; border-radius: 14px; object-fit: cover; box-shadow: 0 7px 24px #22d3ee24; }
 .brand-mark { width: 11px; height: 38px; border-radius: 8px; background: linear-gradient(#22d3ee, #a855f7); box-shadow: 0 0 22px #a855f799; }
 .brand p, .eyebrow { margin: 0 0 4px; color: #919aac; font: 700 12px/1.2 "Rajdhani", sans-serif; letter-spacing: .16em; }
 .brand h1 { margin: 0; font-size: clamp(20px, 2vw, 27px); letter-spacing: -.03em; }
@@ -105,10 +106,10 @@ main { max-width: 1540px; margin: auto; padding: clamp(20px, 3vw, 46px) clamp(16
 .legend-item b { color: #737e8f; font: 10px "Space Mono"; }
 .legend-empty { color: #737e8f; font-size: 12px; line-height: 1.5; }
 #map { min-width: 0; height: 100%; background: #10141b; }
-.school-map-marker { position: absolute; width: 22px; height: 28px; padding: 0; border: 0; background: transparent; cursor: pointer; opacity: .26; filter: grayscale(.72); transition: opacity .2s, filter .2s; }
-.school-map-marker .marker-glyph { display: block; width: 100%; height: 100%; background: var(--school-color); -webkit-mask: url("./assets/school-marker.svg") center / contain no-repeat; mask: url("./assets/school-marker.svg") center / contain no-repeat; filter: drop-shadow(0 0 5px var(--school-color)); }
-.school-map-marker.active { width: 32px; height: 39px; opacity: 1; filter: drop-shadow(0 0 8px #a855f777); z-index: 2; }
-.school-map-marker:hover, .school-map-marker:focus-visible { opacity: 1; filter: none; outline: 2px solid #f4f6fa; outline-offset: 2px; }
+.school-map-marker { position: absolute; width: 42px; height: 42px; padding: 7px; border: 2px solid #f4f6fa; border-radius: 12px; background: #111722ee; cursor: pointer; opacity: 1; box-shadow: 0 5px 18px #000a, 0 0 13px var(--school-color); transition: transform .2s, box-shadow .2s; z-index: 2; }
+.school-map-marker .marker-glyph { display: block; width: 100%; height: 100%; background: var(--school-color); -webkit-mask: url("./assets/school-building.svg") center / contain no-repeat; mask: url("./assets/school-building.svg") center / contain no-repeat; filter: drop-shadow(0 0 5px var(--school-color)); }
+.school-map-marker.active { opacity: 1; }
+.school-map-marker:hover, .school-map-marker:focus-visible { transform: translateY(-2px); box-shadow: 0 8px 24px #000c, 0 0 18px var(--school-color); outline: 2px solid #f4f6fa; outline-offset: 2px; }
 .school-map-marker span { position: absolute; top: -5px; right: -8px; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px; border: 2px solid #090b10; border-radius: 999px; color: #090b10; background: #f4f6fa; font: 700 10px "Rajdhani"; box-shadow: 0 3px 12px #0009; }
 .maplibregl-popup-content { max-width: 330px; border: 1px solid #3a4252; border-radius: 12px; color: #f4f6fa; background: #11151df2; box-shadow: 0 18px 50px #0008; backdrop-filter: blur(10px); }
 .maplibregl-popup-tip { border-top-color: #11151d !important; }
@@ -162,7 +163,6 @@ body, button, input, .brand p, .eyebrow, .sync, .tab-count, .live-badge,
 .unknown-filter { margin-top: 6px; }
 
 .school-map-marker { color: var(--school-color); }
-.school-map-marker.private .marker-glyph { transform: rotate(4deg); }
 .school-map-marker.active { filter: drop-shadow(0 0 9px var(--school-color)); }
 .school-popup p { font-size: 11px; }
 .school-popup h3 { font-size: 17px; }
@@ -171,7 +171,7 @@ body, button, input, .brand p, .eyebrow, .sync, .tab-count, .live-badge,
 
 .auth-overlay { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 22px; background: radial-gradient(circle at 50% 15%, #2b1647, #090b10 62%); }
 .login-card { width: min(440px, 100%); padding: 34px; border: 1px solid #3a4354; border-radius: 20px; background: linear-gradient(145deg, #171d29, #0f131b); box-shadow: 0 30px 100px #000b; }
-.login-card > img { width: 54px; height: 64px; margin-bottom: 18px; }
+.login-card > .login-logo { width: 104px; height: 104px; margin-bottom: 18px; border: 1px solid #67d9f355; border-radius: 20px; object-fit: cover; box-shadow: 0 10px 32px #22d3ee22; }
 .login-card h2 { margin: 0 0 8px; font-size: 31px; }
 .login-card > p:not(.eyebrow):not(.login-error) { margin: 0 0 23px; color: #a8b1c1; font-size: 16px; line-height: 1.45; }
 .login-card label { display: grid; gap: 6px; margin: 14px 0; color: #c7cfdb; font-size: 15px; font-weight: 600; }
@@ -207,6 +207,7 @@ body, button, input, .brand p, .eyebrow, .sync, .tab-count, .live-badge,
   #map { height: 520px; }
 }
 @media (max-width: 480px) {
+  .header-logo { width: 48px; height: 48px; margin-left: 0; }
   .brand p { display: none; } .brand h1 { font-size: 18px; }
   .sync { font-size: 9px; }
   .vessel-layout { grid-template-columns: 1fr; text-align: center; }

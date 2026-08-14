@@ -109,11 +109,8 @@ describe("agregación segura", () => {
     expect(Object.keys(result.schools[0].roles.student.years)).toEqual(["1", "2", "3", "4", "5", "6", "7"]);
   });
 
-  it("expone solo los campos mínimos necesarios para el mapa de matrícula", () => {
-    expect(result.mapPoints).toHaveLength(2);
-    expect(Object.keys(result.mapPoints[0])).toEqual([
-      "school", "schoolNumber", "managementType", "complete", "lat", "lon",
-    ]);
+  it("no expone coordenadas individuales de matrícula", () => {
+    expect(result.mapPoints).toEqual([]);
     expect(JSON.stringify(result)).not.toContain("privada");
   });
 
@@ -145,13 +142,6 @@ describe("agregación segura", () => {
     );
     expect(withMissingSchool.summary).toMatchObject({ total: 1, complete: 0, incomplete: 1 });
     expect(withMissingSchool.schools).toEqual([]);
-    expect(withMissingSchool.mapPoints).toEqual([{
-      school: "Sin escuela identificada",
-      schoolNumber: null,
-      managementType: "unknown",
-      complete: false,
-      lat: -34,
-      lon: -58,
-    }]);
+    expect(withMissingSchool.mapPoints).toEqual([]);
   });
 });
