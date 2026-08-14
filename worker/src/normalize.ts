@@ -234,6 +234,8 @@ export function buildDashboard(
         date: timestamp.date,
         time: timestamp.time,
         school: identity?.school.original ?? "Sin escuela identificada",
+        managementType: identity?.managementType ?? "unknown",
+        courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
         complete: detectCompletion(raw, completionField),
       };
     }).sort((left, right) => `${right.date} ${right.time}`.localeCompare(`${left.date} ${left.time}`)),

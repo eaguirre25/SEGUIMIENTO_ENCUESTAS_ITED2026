@@ -445,9 +445,11 @@ function renderMonitoring(): void {
         <span>${formatNumber(rows.length)} registros</span>
       </div>
       ${rows.length ? `<div class="monitoring-table-wrap"><table class="monitoring-table">
-        <thead><tr><th>Fecha</th><th>Hora</th><th>¿A qué escuela vas?</th><th>Encuesta completa</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Hora</th><th>¿A qué escuela vas?</th><th>Gestión</th><th>Año de secundaria</th><th>Encuesta completa</th></tr></thead>
         <tbody>${rows.map((row) => `<tr>
           <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.school)}</td>
+          <td><span class="management-badge ${row.managementType}">${managementLabel(row.managementType)}</span></td>
+          <td>${row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`}</td>
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "SI" : "NO"}</span></td>
         </tr>`).join("")}</tbody>
       </table></div>` : `<div class="monitoring-empty"><strong>Sin cargas registradas</strong><p>Los resultados de ${POPULATION_LABELS[activePopulation].toLocaleLowerCase("es-AR")} se mostrarán aquí cuando la encuesta esté conectada.</p></div>`}
@@ -783,5 +785,8 @@ function formatTime(value: string): string { return new Intl.DateTimeFormat("es-
 function formatDate(value: string): string {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return match ? `${match[3]}/${match[2]}/${match[1]}` : escapeHtml(value || "—");
+}
+function managementLabel(value: ManagementType): string {
+  return value === "state" ? "Estatal" : value === "private" ? "Privada" : "Sin informar";
 }
 function escapeHtml(value: string): string { return value.replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]!); }
