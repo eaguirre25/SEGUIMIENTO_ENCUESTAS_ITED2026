@@ -63,6 +63,7 @@ export interface LoadMonitoringRow {
   date: string;
   time: string;
   school: string;
+  schoolIdentifier: string;
   managementType: ManagementType;
   courseYear: number | null;
   complete: boolean;

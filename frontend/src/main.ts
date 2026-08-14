@@ -56,7 +56,7 @@ type SchoolLocation = StateSchool | PrivateSchool;
 type Population = "students" | "teachers" | "families";
 type DashboardView = "tracking" | "map" | "monitoring";
 type MonitoringRow = DashboardPayload["monitoringRows"][number];
-type MonitoringSortKey = "date" | "time" | "school" | "managementType" | "courseYear" | "complete";
+type MonitoringSortKey = "date" | "time" | "school" | "schoolIdentifier" | "managementType" | "courseYear" | "complete";
 
 const POPULATION_LABELS: Record<Population, string> = {
   students: "ESTUDIANTES",
@@ -450,9 +450,10 @@ function renderMonitoring(): void {
         <span>${formatNumber(rows.length)} registros</span>
       </div>
       ${rows.length ? `<div class="monitoring-table-wrap"><table class="monitoring-table">
-        <thead><tr>${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("¿A qué escuela vas?", "school")}${sortHeader("Gestión", "managementType")}${sortHeader("Año de secundaria", "courseYear")}${sortHeader("Encuesta completa", "complete")}</tr></thead>
+        <thead><tr>${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("¿A qué escuela vas?", "school")}${sortHeader("ID escuela", "schoolIdentifier")}${sortHeader("Gestión", "managementType")}${sortHeader("Año de secundaria", "courseYear")}${sortHeader("Encuesta completa", "complete")}</tr></thead>
         <tbody>${rows.map((row) => `<tr>
           <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.school)}</td>
+          <td>${escapeHtml(row.schoolIdentifier)}</td>
           <td><span class="management-badge ${row.managementType}">${managementLabel(row.managementType)}</span></td>
           <td>${row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`}</td>
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "SI" : "NO"}</span></td>

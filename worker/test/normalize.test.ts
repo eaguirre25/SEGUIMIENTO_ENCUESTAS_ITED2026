@@ -149,14 +149,15 @@ describe("agregación segura", () => {
       MANAGEMENT_TYPE: "management",
       STATE_SCHOOL: "school",
       PRIVATE_SCHOOL: "school",
+      SCHOOL_IDENTIFIER: "school_identifier",
     };
     const monitored = buildDashboard([
-      { school: "Media 1", year: "1.º año", management: "Estatal", startdate: "2026-08-14 08:05:00", submitdate: null },
-      { school: "  Colegio del Parque  ", year: "3", management: "Privada", startdate: "2026-08-14 09:15:30", submitdate: "2026-08-14 09:20:00" },
+      { school: "Media 1", school_identifier: "ID-001", year: "1.º año", management: "Estatal", startdate: "2026-08-14 08:05:00", submitdate: null },
+      { school: "  Colegio del Parque  ", school_identifier: "  PRIV-09  ", year: "3", management: "Privada", startdate: "2026-08-14 09:15:30", submitdate: "2026-08-14 09:20:00" },
     ], "977929", monitoringMap);
     expect(monitored.monitoringRows).toEqual([
-      { date: "2026-08-14", time: "09:15:30", school: "  Colegio del Parque  ", managementType: "private", courseYear: 3, complete: true },
-      { date: "2026-08-14", time: "08:05:00", school: "Media 1", managementType: "state", courseYear: 1, complete: false },
+      { date: "2026-08-14", time: "09:15:30", school: "  Colegio del Parque  ", schoolIdentifier: "  PRIV-09  ", managementType: "private", courseYear: 3, complete: true },
+      { date: "2026-08-14", time: "08:05:00", school: "Media 1", schoolIdentifier: "ID-001", managementType: "state", courseYear: 1, complete: false },
     ]);
     expect(monitored.monitoringRows).toHaveLength(monitored.summary.total);
   });

@@ -245,12 +245,17 @@ export function buildDashboard(
         date: timestamp.date,
         time: timestamp.time,
         school: schoolAnswerAsReceived(raw, map),
+        schoolIdentifier: answerAsReceived(map.SCHOOL_IDENTIFIER ? readMappedValue(raw, map.SCHOOL_IDENTIFIER) : null),
         managementType: identity?.managementType ?? "unknown",
         courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
         complete: detectCompletion(raw, completionField),
       };
     }).sort((left, right) => `${right.date} ${right.time}`.localeCompare(`${left.date} ${left.time}`)),
   };
+}
+
+function answerAsReceived(value: unknown): string {
+  return value === null || value === undefined ? "Sin informar" : String(value);
 }
 
 export function splitTimestamp(value: unknown): { date: string; time: string } {
