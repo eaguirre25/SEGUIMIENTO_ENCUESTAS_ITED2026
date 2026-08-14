@@ -213,7 +213,20 @@ export function buildDashboard(
     surveyId,
     summary: finishCounts(summary),
     schools: schoolList,
-    mapPoints: [],
+    mapPoints: rawResponses.flatMap((raw) => {
+      const lat = map.LATITUDE ? parseCoordinate(readMappedValue(raw, map.LATITUDE), "lat") : null;
+      const lon = map.LONGITUDE ? parseCoordinate(readMappedValue(raw, map.LONGITUDE), "lon") : null;
+      if (lat === null || lon === null) return [];
+      const identity = identifySchool(raw, map);
+      return [{
+        school: identity?.school.original ?? "Sin escuela identificada",
+        schoolNumber: identity?.schoolNumber ?? null,
+        managementType: identity?.managementType ?? "unknown",
+        complete: detectCompletion(raw, completionField),
+        lat,
+        lon,
+      }];
+    }),
   };
 }
 

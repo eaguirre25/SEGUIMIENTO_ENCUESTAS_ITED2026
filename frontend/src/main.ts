@@ -24,6 +24,7 @@ let mapLoaded = false;
 let schoolMarkers: maplibregl.Marker[] = [];
 let authHeader = localStorage.getItem("dashboard-authorization") ?? sessionStorage.getItem("dashboard-authorization") ?? "";
 let mapMode: "points" | "heatmap" = "points";
+let showThreads = true;
 let filtersInitialized = false;
 const selectedSchoolIds = new Set<string>();
 
@@ -50,6 +51,17 @@ interface PrivateSchool {
 }
 
 type SchoolLocation = StateSchool | PrivateSchool;
+
+interface ResolvedMapPoint {
+  schoolId: string;
+  school: string;
+  managementType: ManagementType;
+  complete: boolean;
+  lat: number;
+  lon: number;
+  color: string;
+  location: SchoolLocation | null;
+}
 
 class AuthenticationError extends Error {}
 
@@ -93,7 +105,7 @@ app.innerHTML = `
       <div class="map-shell">
         <aside class="map-legend"><div><p class="eyebrow">FILTROS DE ESCUELAS</p><h2>Escuelas encuestadas</h2><p id="legend-summary" class="legend-summary"></p></div><div id="legend-items"></div></aside>
         <div class="map-stage">
-          <div class="map-toolbar"><button id="points-mode" class="map-tool active" type="button">Escuelas</button><button id="heatmap-mode" class="map-tool" type="button">Mapa de calor</button></div>
+          <div class="map-toolbar"><button id="points-mode" class="map-tool active" type="button">Matrícula</button><button id="heatmap-mode" class="map-tool" type="button">Mapa de calor</button><button id="threads-toggle" class="map-tool active" type="button">Hilos</button></div>
           <div id="map-status" class="map-status"></div>
           <div id="map"></div>
         </div>
@@ -122,6 +134,7 @@ document.querySelector<HTMLFormElement>("#login-form")?.addEventListener("submit
 document.querySelector<HTMLButtonElement>("#logout")?.addEventListener("click", logout);
 document.querySelector<HTMLButtonElement>("#points-mode")?.addEventListener("click", () => setMapMode("points"));
 document.querySelector<HTMLButtonElement>("#heatmap-mode")?.addEventListener("click", () => setMapMode("heatmap"));
+document.querySelector<HTMLButtonElement>("#threads-toggle")?.addEventListener("click", toggleThreads);
 
 void refresh();
 setInterval(() => void refresh(), REFRESH_MS);
@@ -277,7 +290,7 @@ function render(): void {
     </section>
   `;
   tracking.querySelector<HTMLButtonElement>("#save-target")?.addEventListener("click", saveTarget);
-  document.querySelector<HTMLElement>("#map-count")!.textContent = String(surveyedSchools().length);
+  document.querySelector<HTMLElement>("#map-count")!.textContent = String(data.mapPoints.length);
   renderLegend();
   renderMapStatus();
   if (mapLoaded) updateMap();
@@ -342,14 +355,25 @@ function initMap(): void {
   map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
   map.on("load", () => {
     mapLoaded = true;
-    map!.addSource("surveyed-schools", { type: "geojson", data: surveyedSchoolsGeoJson() });
-    map!.addLayer({ id: "heatmap", type: "heatmap", source: "surveyed-schools", layout: { visibility: "none" }, paint: {
-      "heatmap-weight": ["interpolate", ["linear"], ["get", "responses"], 0, 0, 30, 1],
+    map!.addImage("private-triangle", createTriangleImage(), { sdf: true, pixelRatio: 2 });
+    map!.addSource("matricula", { type: "geojson", data: responseGeoJson() });
+    map!.addSource("threads", { type: "geojson", data: threadsGeoJson() });
+    map!.addLayer({ id: "heatmap", type: "heatmap", source: "matricula", layout: { visibility: "none" }, paint: {
+      "heatmap-weight": 1,
       "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 9, 0.7, 14, 2.2],
       "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 9, 18, 14, 38],
       "heatmap-opacity": 0.88,
       "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(9,11,16,0)", 0.2, "#22D3EE", 0.45, "#60A5FA", 0.7, "#A855F7", 0.9, "#F472B6", 1, "#FACC15"],
     } });
+    map!.addLayer({ id: "threads", type: "line", source: "threads", paint: { "line-color": ["get", "color"], "line-width": 1.5, "line-opacity": 0.48, "line-dasharray": [2, 2] } });
+    map!.addLayer({ id: "state-points", type: "circle", source: "matricula", filter: ["==", ["get", "managementType"], "state"], paint: { "circle-radius": 6.5, "circle-color": ["get", "color"], "circle-stroke-color": "#F4F6FA", "circle-stroke-width": 1.4, "circle-opacity": 0.94 } });
+    map!.addLayer({ id: "private-points", type: "symbol", source: "matricula", filter: ["==", ["get", "managementType"], "private"], layout: { "icon-image": "private-triangle", "icon-size": 0.7, "icon-allow-overlap": true }, paint: { "icon-color": ["get", "color"], "icon-halo-color": "#F4F6FA", "icon-halo-width": 1.2 } });
+    map!.addLayer({ id: "unknown-points", type: "circle", source: "matricula", filter: ["==", ["get", "managementType"], "unknown"], paint: { "circle-radius": 6, "circle-color": "#919AAC", "circle-stroke-color": "#F4F6FA", "circle-stroke-width": 1.2 } });
+    for (const layer of ["state-points", "private-points", "unknown-points"]) {
+      map!.on("click", layer, (event) => showResponsePopup(event));
+      map!.on("mouseenter", layer, () => { map!.getCanvas().style.cursor = "pointer"; });
+      map!.on("mouseleave", layer, () => { map!.getCanvas().style.cursor = ""; });
+    }
     updateSchoolMarkers();
     updateLayerVisibility();
     fitMap();
@@ -358,7 +382,8 @@ function initMap(): void {
 
 function updateMap(): void {
   if (!map || !mapLoaded) return;
-  (map.getSource("surveyed-schools") as GeoJSONSource).setData(surveyedSchoolsGeoJson());
+  (map.getSource("matricula") as GeoJSONSource).setData(responseGeoJson());
+  (map.getSource("threads") as GeoJSONSource).setData(threadsGeoJson());
   updateSchoolMarkers();
   updateLayerVisibility();
 }
@@ -399,11 +424,14 @@ function updateSchoolMarkers(): void {
 function fitMap(): void {
   if (!map) return;
   const bounds = new maplibregl.LngLatBounds();
-  const visible = visibleSurveyedSchools();
-  const located = surveyedSchools();
-  (visible.length ? visible : located).forEach(({ location }) => bounds.extend(location.coordinates));
+  const visible = visibleMapPoints();
+  if (visible.length) visible.forEach((point) => {
+    bounds.extend([point.lon, point.lat]);
+    if (point.location) bounds.extend(point.location.coordinates);
+  });
+  else surveyedSchools().forEach(({ location }) => bounds.extend(location.coordinates));
   if (bounds.isEmpty()) return;
-  map.fitBounds(bounds, { padding: 70, maxZoom: 14, duration: 900 });
+  map.fitBounds(bounds, { padding: { top: 120, right: 70, bottom: 80, left: 70 }, maxZoom: 14, duration: 900 });
 }
 
 function renderLegend(): void {
@@ -414,7 +442,7 @@ function renderLegend(): void {
     { type: "private", label: "Escuelas secundarias (G. Privadas)", shape: "▥", schools: data.schools.filter((school) => school.managementType === "private" && schoolLocationForSummary(school)) },
   ];
   const summary = document.querySelector<HTMLElement>("#legend-summary");
-  if (summary) summary.textContent = `${surveyedSchools().length} escuelas encuestadas ubicadas · ${data.summary.total} respuestas recibidas`;
+  if (summary) summary.textContent = `${data.mapPoints.length} puntos de matrícula · ${surveyedSchools().length} escuelas encuestadas ubicadas`;
   legend.innerHTML = groups.map((group) => {
     const ids = group.schools.map(schoolIdForSummary);
     const checked = ids.length > 0 && ids.every((id) => selectedSchoolIds.has(id));
@@ -423,7 +451,8 @@ function renderLegend(): void {
         const id = schoolIdForSummary(school);
         return `<label class="school-filter"><input type="checkbox" data-school-id="${id}" ${selectedSchoolIds.has(id) ? "checked" : ""}><i style="--school-color:${colorFor(id)}"></i><span>${escapeHtml(schoolDisplayName(school))}</span><b>${school.total}</b></label>`;
       }).join("") || `<p class="legend-empty">Sin respuestas identificadas.</p>`}</div></section>`;
-  }).join("");
+  }).join("") + (resolvedMapPoints().some((point) => point.managementType === "unknown")
+    ? `<label class="school-filter unknown-filter"><input type="checkbox" data-school-id="unknown" ${selectedSchoolIds.has("unknown") ? "checked" : ""}><i></i><span>Matrícula sin escuela identificada</span></label>` : "");
   legend.querySelectorAll<HTMLInputElement>("[data-school-id]").forEach((input) => input.addEventListener("change", () => {
     const id = input.dataset.schoolId;
     if (id) input.checked ? selectedSchoolIds.add(id) : selectedSchoolIds.delete(id);
@@ -440,6 +469,7 @@ function renderLegend(): void {
 function initializeFilters(): void {
   if (filtersInitialized || !data) return;
   data.schools.map(schoolIdForSummary).forEach((id) => selectedSchoolIds.add(id));
+  if (data.mapPoints.some((point) => point.managementType === "unknown")) selectedSchoolIds.add("unknown");
   filtersInitialized = true;
 }
 
@@ -479,12 +509,58 @@ function visibleSurveyedSchools(): Array<{ location: SchoolLocation; summary: Sc
   return surveyedSchools().filter(({ id }) => selectedSchoolIds.has(id));
 }
 
-function surveyedSchoolsGeoJson() {
-  return { type: "FeatureCollection" as const, features: visibleSurveyedSchools().map(({ location, summary, id }) => ({
+function resolvedMapPoints(): ResolvedMapPoint[] {
+  return (data?.mapPoints ?? []).map((point) => {
+    let location: SchoolLocation | null = null;
+    if (point.managementType === "state" && point.schoolNumber !== null) location = STATE_SCHOOLS.find((school) => school.schoolNumber === point.schoolNumber) ?? null;
+    if (point.managementType === "private") {
+      const key = privateSchoolKey(point.school);
+      const matches = PRIVATE_SCHOOLS.filter((school) => privateSchoolKey(school.name) === key);
+      location = matches.length === 1 ? matches[0] : null;
+    }
+    const schoolId = location?.id ?? (point.managementType === "unknown" ? "unknown" : `${point.managementType}:${privateSchoolKey(point.school)}`);
+    return { ...point, schoolId, color: colorFor(schoolId), location };
+  });
+}
+
+function visibleMapPoints(): ResolvedMapPoint[] {
+  return resolvedMapPoints().filter((point) => selectedSchoolIds.has(point.schoolId));
+}
+
+function responseGeoJson() {
+  return { type: "FeatureCollection" as const, features: visibleMapPoints().map((point) => ({
     type: "Feature" as const,
-    properties: { schoolId: id, responses: summary.total, managementType: summary.managementType },
-    geometry: { type: "Point" as const, coordinates: location.coordinates },
+    properties: { schoolId: point.schoolId, school: point.school, managementType: point.managementType, complete: point.complete, color: point.color },
+    geometry: { type: "Point" as const, coordinates: [point.lon, point.lat] },
   })) };
+}
+
+function threadsGeoJson() {
+  return { type: "FeatureCollection" as const, features: visibleMapPoints().flatMap((point) => point.location ? [{
+    type: "Feature" as const,
+    properties: { schoolId: point.schoolId, color: point.color },
+    geometry: { type: "LineString" as const, coordinates: [[point.lon, point.lat], point.location.coordinates] },
+  }] : []) };
+}
+
+function createTriangleImage(): ImageData {
+  const canvas = document.createElement("canvas");
+  canvas.width = 48; canvas.height = 48;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("No se pudo crear el símbolo triangular");
+  context.fillStyle = "#FFFFFF";
+  context.beginPath(); context.moveTo(24, 4); context.lineTo(44, 42); context.lineTo(4, 42); context.closePath(); context.fill();
+  return context.getImageData(0, 0, 48, 48);
+}
+
+function showResponsePopup(event: maplibregl.MapLayerMouseEvent): void {
+  const feature = event.features?.[0];
+  if (!feature || feature.geometry.type !== "Point") return;
+  const properties = feature.properties as { school: string; managementType: ManagementType; complete: boolean | string };
+  const coordinates = feature.geometry.coordinates as [number, number];
+  const management = properties.managementType === "state" ? "Gestión estatal · círculo" : properties.managementType === "private" ? "Gestión privada · triángulo" : "Gestión no identificada";
+  const complete = properties.complete === true || properties.complete === "true";
+  new maplibregl.Popup({ closeButton: false }).setLngLat(coordinates).setHTML(`<div class="school-popup"><p>PUNTO DE MATRÍCULA</p><h3>${escapeHtml(properties.school)}</h3><span>${management}</span><strong>${complete ? "Respuesta completa" : "Respuesta incompleta"}</strong></div>`).addTo(map!);
 }
 
 function updateMapAfterFilter(): void {
@@ -498,18 +574,26 @@ function setMapMode(mode: "points" | "heatmap"): void {
   updateLayerVisibility();
 }
 
+function toggleThreads(): void {
+  showThreads = !showThreads;
+  document.querySelector("#threads-toggle")?.classList.toggle("active", showThreads);
+  updateLayerVisibility();
+}
+
 function updateLayerVisibility(): void {
   if (!map || !mapLoaded) return;
+  const pointsVisibility = mapMode === "points" ? "visible" : "none";
+  for (const layer of ["state-points", "private-points", "unknown-points"]) if (map.getLayer(layer)) map.setLayoutProperty(layer, "visibility", pointsVisibility);
+  if (map.getLayer("threads")) map.setLayoutProperty("threads", "visibility", mapMode === "points" && showThreads ? "visible" : "none");
   if (map.getLayer("heatmap")) map.setLayoutProperty("heatmap", "visibility", mapMode === "heatmap" ? "visible" : "none");
-  schoolMarkers.forEach((marker) => marker.getElement().classList.toggle("hidden", mapMode === "heatmap"));
 }
 
 function renderMapStatus(): void {
   const status = document.querySelector<HTMLElement>("#map-status");
   if (!status || !data) return;
-  const visible = visibleSurveyedSchools().length;
-  const located = surveyedSchools().length;
-  status.textContent = `${visible} de ${located} escuelas encuestadas visibles · ${data.summary.total} respuestas recibidas (${data.summary.complete} completas y ${data.summary.incomplete} incompletas)`;
+  const visible = visibleMapPoints().length;
+  const missingCoordinates = data.summary.total - data.mapPoints.length;
+  status.textContent = `${visible} de ${data.mapPoints.length} puntos de matrícula visibles · ${surveyedSchools().length} escuelas encuestadas ubicadas · ${data.summary.total} respuestas recibidas (${data.summary.complete} completas y ${data.summary.incomplete} incompletas) · ${missingCoordinates} sin coordenadas válidas`;
 }
 
 function colorFor(school: string): string {
