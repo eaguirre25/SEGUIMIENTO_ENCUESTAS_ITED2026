@@ -24,12 +24,12 @@ export default {
       assertEnv(env);
       if (!(await isAuthorized(request, env))) return unauthorized(cors);
       const forceRefresh = url.searchParams.get("refresh") === "1";
-      const weekend = isWeekendInBuenosAires(Date.now());
-      if (!forceRefresh || weekend) {
+      const refreshPaused = isDashboardRefreshPaused(Date.now());
+      if (!forceRefresh || refreshPaused) {
         const cached = await readCachedDashboard(env);
-        if (cached) return jsonText(cached, 200, cors, weekend ? "D1-WEEKEND" : "D1");
-        if (weekend) {
-          return jsonError("La actualización está pausada durante el fin de semana", 503, cors);
+        if (cached) return jsonText(cached, 200, cors, refreshPaused ? "D1-PAUSED" : "D1");
+        if (refreshPaused) {
+          return jsonError("La actualización está pausada fuera del horario operativo", 503, cors);
         }
       }
       const fresh = await refreshDashboard(env);
@@ -41,10 +41,10 @@ export default {
     }
   },
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    if (isWeekendInBuenosAires(controller.scheduledTime)) {
+    if (isDashboardRefreshPaused(controller.scheduledTime)) {
       console.log(JSON.stringify({
         message: "dashboard refresh skipped",
-        reason: "weekend",
+        reason: "outside operating hours",
         timeZone: DASHBOARD_TIME_ZONE,
       }));
       return;
@@ -56,12 +56,17 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-export function isWeekendInBuenosAires(timestamp: number): boolean {
-  const weekday = new Intl.DateTimeFormat("en-US", {
+export function isDashboardRefreshPaused(timestamp: number): boolean {
+  const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: DASHBOARD_TIME_ZONE,
     weekday: "short",
-  }).format(new Date(timestamp));
-  return weekday === "Sat" || weekday === "Sun";
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(timestamp));
+  const weekday = parts.find((part) => part.type === "weekday")?.value;
+  const hour = Number(parts.find((part) => part.type === "hour")?.value);
+  const weekend = weekday === "Sat" || weekday === "Sun";
+  return weekend || hour >= 23 || hour < 8;
 }
 
 async function readCachedDashboard(env: Env): Promise<string | null> {

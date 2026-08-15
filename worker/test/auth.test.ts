@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import worker, { isWeekendInBuenosAires } from "../src/index";
+import worker, { isDashboardRefreshPaused } from "../src/index";
 import type { Env } from "../src/types";
 
 const env: Env = {
@@ -51,13 +51,20 @@ describe("protección del dashboard", () => {
 
 describe("pausa de actualización durante el fin de semana", () => {
   it("reconoce sábado, domingo y lunes en la zona horaria de Buenos Aires", () => {
-    expect(isWeekendInBuenosAires(Date.parse("2026-08-15T15:00:00Z"))).toBe(true);
-    expect(isWeekendInBuenosAires(Date.parse("2026-08-16T15:00:00Z"))).toBe(true);
-    expect(isWeekendInBuenosAires(Date.parse("2026-08-17T15:00:00Z"))).toBe(false);
+    expect(isDashboardRefreshPaused(Date.parse("2026-08-15T15:00:00Z"))).toBe(true);
+    expect(isDashboardRefreshPaused(Date.parse("2026-08-16T15:00:00Z"))).toBe(true);
+    expect(isDashboardRefreshPaused(Date.parse("2026-08-17T15:00:00Z"))).toBe(false);
+  });
+});
+
+describe("pausa nocturna durante los días hábiles", () => {
+  it("reanuda a las 08:00 hora de Buenos Aires", () => {
+    expect(isDashboardRefreshPaused(Date.parse("2026-08-17T10:59:59Z"))).toBe(true);
+    expect(isDashboardRefreshPaused(Date.parse("2026-08-17T11:00:00Z"))).toBe(false);
   });
 
-  it("aplica la pausa desde la medianoche local y no desde la medianoche UTC", () => {
-    expect(isWeekendInBuenosAires(Date.parse("2026-08-15T02:59:59Z"))).toBe(false);
-    expect(isWeekendInBuenosAires(Date.parse("2026-08-15T03:00:00Z"))).toBe(true);
+  it("se inicia a las 23:00 hora de Buenos Aires", () => {
+    expect(isDashboardRefreshPaused(Date.parse("2026-08-18T01:59:59Z"))).toBe(false);
+    expect(isDashboardRefreshPaused(Date.parse("2026-08-18T02:00:00Z"))).toBe(true);
   });
 });
