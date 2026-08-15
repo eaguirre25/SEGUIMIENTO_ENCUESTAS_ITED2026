@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import worker from "../src/index";
+import worker, { isWeekendInBuenosAires } from "../src/index";
 import type { Env } from "../src/types";
 
 const env: Env = {
@@ -46,5 +46,18 @@ describe("protección del dashboard", () => {
     expect(allowedHeaders).toContain("Cache-Control");
     expect(allowedHeaders).toContain("Pragma");
     expect(response.headers.get("Access-Control-Max-Age")).toBe("86400");
+  });
+});
+
+describe("pausa de actualización durante el fin de semana", () => {
+  it("reconoce sábado, domingo y lunes en la zona horaria de Buenos Aires", () => {
+    expect(isWeekendInBuenosAires(Date.parse("2026-08-15T15:00:00Z"))).toBe(true);
+    expect(isWeekendInBuenosAires(Date.parse("2026-08-16T15:00:00Z"))).toBe(true);
+    expect(isWeekendInBuenosAires(Date.parse("2026-08-17T15:00:00Z"))).toBe(false);
+  });
+
+  it("aplica la pausa desde la medianoche local y no desde la medianoche UTC", () => {
+    expect(isWeekendInBuenosAires(Date.parse("2026-08-15T02:59:59Z"))).toBe(false);
+    expect(isWeekendInBuenosAires(Date.parse("2026-08-15T03:00:00Z"))).toBe(true);
   });
 });

@@ -4,6 +4,7 @@ import { DASHBOARD_EXPORT_FIELDS } from "./question-map";
 import type { Env } from "./types";
 
 const CACHE_ROW_ID = 1;
+const DASHBOARD_TIME_ZONE = "America/Argentina/Buenos_Aires";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -23,9 +24,13 @@ export default {
       assertEnv(env);
       if (!(await isAuthorized(request, env))) return unauthorized(cors);
       const forceRefresh = url.searchParams.get("refresh") === "1";
-      if (!forceRefresh) {
+      const weekend = isWeekendInBuenosAires(Date.now());
+      if (!forceRefresh || weekend) {
         const cached = await readCachedDashboard(env);
-        if (cached) return jsonText(cached, 200, cors, "D1");
+        if (cached) return jsonText(cached, 200, cors, weekend ? "D1-WEEKEND" : "D1");
+        if (weekend) {
+          return jsonError("La actualización está pausada durante el fin de semana", 503, cors);
+        }
       }
       const fresh = await refreshDashboard(env);
       return jsonText(fresh, 200, cors, forceRefresh ? "REFRESH" : "SEED");
@@ -35,13 +40,29 @@ export default {
       return jsonError(message, 502, cors);
     }
   },
-  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    if (isWeekendInBuenosAires(controller.scheduledTime)) {
+      console.log(JSON.stringify({
+        message: "dashboard refresh skipped",
+        reason: "weekend",
+        timeZone: DASHBOARD_TIME_ZONE,
+      }));
+      return;
+    }
     ctx.waitUntil(refreshDashboard(env).then(
       () => console.log(JSON.stringify({ message: "dashboard cache refreshed" })),
       (error) => console.error(JSON.stringify({ message: "dashboard refresh failed", error: errorMessage(error) })),
     ));
   },
 } satisfies ExportedHandler<Env>;
+
+export function isWeekendInBuenosAires(timestamp: number): boolean {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: DASHBOARD_TIME_ZONE,
+    weekday: "short",
+  }).format(new Date(timestamp));
+  return weekday === "Sat" || weekday === "Sun";
+}
 
 async function readCachedDashboard(env: Env): Promise<string | null> {
   const row = await env.DASHBOARD_DB.prepare(
