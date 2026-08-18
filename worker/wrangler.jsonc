@@ -7,6 +7,7 @@
   "triggers": { "crons": ["* * * * *"] },
   "vars": {
     "LIMESURVEY_STUDENT_SURVEY_ID": "977929",
+    "LIMESURVEY_TEACHER_SURVEY_ID": "284898",
     "DASHBOARD_ALLOWED_ORIGIN": "http://localhost:5173"
   },
   "env": {
@@ -16,11 +17,13 @@
         {
           "binding": "DASHBOARD_DB",
           "database_name": "limesurvey-dashboard-cache",
-          "database_id": "74c9825b-e50e-430c-bc75-0efdb7ea5b81"
+          "database_id": "74c9825b-e50e-430c-bc75-0efdb7ea5b81",
+          "migrations_dir": "migrations"
         }
       ],
       "vars": {
         "LIMESURVEY_STUDENT_SURVEY_ID": "977929",
+        "LIMESURVEY_TEACHER_SURVEY_ID": "284898",
         "DASHBOARD_ALLOWED_ORIGIN": "https://eaguirre25.github.io"
       }
     }

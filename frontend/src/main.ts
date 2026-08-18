@@ -18,6 +18,7 @@ const COLORS = [
 
 let data: DashboardPayload | null = null;
 let studentData: DashboardPayload | null = null;
+let teacherData: DashboardPayload | null = null;
 let activePopulation: Population = "students";
 let lastSuccessfulFetch = 0;
 let warning = "";
@@ -113,7 +114,7 @@ app.innerHTML = `
     <span id="population-title">Resultados de</span>
     <div class="population-switcher" role="group" aria-label="Población de la encuesta">
       <button class="population-button active" data-population="students" type="button">Estudiantes <b id="students-count">0</b></button>
-      <button class="population-button" data-population="teachers" type="button">Docentes <b>0</b></button>
+      <button class="population-button" data-population="teachers" type="button">Docentes <b id="teachers-count">0</b></button>
       <button class="population-button" data-population="families" type="button">Familias <b>0</b></button>
     </div>
   </section>
@@ -183,9 +184,13 @@ async function refresh(): Promise<void> {
     return;
   }
   try {
-    const fresh = DATA_MODE === "demo" ? demoPayload() : await fetchApi();
-    validatePayload(fresh);
-    studentData = fresh;
+    const [students, teachers] = DATA_MODE === "demo"
+      ? [demoPayload(), emptyPayload()]
+      : await Promise.all([fetchApi("students"), fetchApi("teachers")]);
+    validatePayload(students);
+    validatePayload(teachers);
+    studentData = students;
+    teacherData = teachers;
     data = payloadForPopulation(activePopulation);
     lastSuccessfulFetch = Date.now();
     warning = "";
@@ -208,9 +213,9 @@ function demoPayload(): DashboardPayload {
   return { ...(structuredClone(demoData) as DashboardPayload), generatedAt: new Date().toISOString() };
 }
 
-async function fetchApi(): Promise<DashboardPayload> {
+async function fetchApi(population: "students" | "teachers" = "students"): Promise<DashboardPayload> {
   if (!API_BASE) throw new Error("El Worker de LimeSurvey todavía no está configurado");
-  const response = await fetch(`${API_BASE}/api/dashboard`, {
+  const response = await fetch(`${API_BASE}/api/dashboard?population=${population}`, {
     headers: { Accept: "application/json", Authorization: authHeader },
   });
   if (response.status === 401) throw new AuthenticationError("Credenciales inválidas");
@@ -227,9 +232,11 @@ async function handleLogin(event: SubmitEvent): Promise<void> {
   const submit = document.querySelector<HTMLButtonElement>("#login-form button[type='submit']");
   if (submit) { submit.disabled = true; submit.textContent = "Verificando…"; }
   try {
-    const fresh = await fetchApi();
-    validatePayload(fresh);
-    studentData = fresh;
+    const [students, teachers] = await Promise.all([fetchApi("students"), fetchApi("teachers")]);
+    validatePayload(students);
+    validatePayload(teachers);
+    studentData = students;
+    teacherData = teachers;
     data = payloadForPopulation(activePopulation);
     lastSuccessfulFetch = Date.now();
     warning = "";
@@ -277,6 +284,7 @@ function logout(): void {
   authHeader = "";
   data = null;
   studentData = null;
+  teacherData = null;
   sessionStorage.removeItem("dashboard-authorization");
   localStorage.removeItem("dashboard-authorization");
   showLogin();
@@ -296,6 +304,11 @@ function validatePayload(payload: DashboardPayload): void {
 
 function payloadForPopulation(population: Population): DashboardPayload | null {
   if (population === "students") return studentData;
+  if (population === "teachers") return teacherData;
+  return emptyPayload();
+}
+
+function emptyPayload(): DashboardPayload {
   return {
     generatedAt: studentData?.generatedAt ?? new Date().toISOString(),
     surveyId: "",
@@ -320,6 +333,8 @@ function selectPopulation(population: Population): void {
   });
   const brandLabel = document.querySelector<HTMLElement>("#brand-survey-label");
   if (brandLabel) brandLabel.textContent = `ITED 2026 · ENCUESTA A ${POPULATION_LABELS[population]}`;
+  const pointsMode = document.querySelector<HTMLElement>("#points-mode");
+  if (pointsMode) pointsMode.textContent = population === "students" ? "Matrícula" : "Respuestas";
   closeSchoolModal();
   render();
 }
@@ -371,6 +386,8 @@ function render(): void {
   document.querySelector<HTMLElement>("#monitoring-count")!.textContent = String(data.monitoringRows.length);
   const studentsCount = document.querySelector<HTMLElement>("#students-count");
   if (studentsCount) studentsCount.textContent = String(studentData?.summary.total ?? 0);
+  const teachersCount = document.querySelector<HTMLElement>("#teachers-count");
+  if (teachersCount) teachersCount.textContent = String(teacherData?.summary.total ?? 0);
   renderMonitoring();
   renderLegend();
   renderMapStatus();
@@ -415,9 +432,12 @@ function openSchoolModal(schoolId: string): void {
   const content = document.querySelector<HTMLElement>("#school-modal-content");
   if (!school || !dialog || !content) return;
   const name = escapeHtml(schoolDisplayName(school));
+  const populationDescription = activePopulation === "students"
+    ? "Estudiantes · seguimiento de respuestas por año"
+    : "Docentes y equipos de conducción · resumen de respuestas";
   content.innerHTML = `
     <header class="modal-school-header">
-      <div><p class="eyebrow">DETALLE DE LA ESCUELA</p><h2 id="school-modal-title"><i style="--school-color:${colorFor(school.school)}"></i>${name}</h2><p>Estudiantes · seguimiento de respuestas por año</p></div>
+      <div><p class="eyebrow">DETALLE DE LA ESCUELA</p><h2 id="school-modal-title"><i style="--school-color:${colorFor(school.school)}"></i>${name}</h2><p>${populationDescription}</p></div>
       <div class="modal-school-total"><span>Total</span><strong>${school.total}</strong></div>
     </header>
     <section class="modal-stats" aria-label="Resumen de respuestas">
@@ -425,13 +445,13 @@ function openSchoolModal(schoolId: string): void {
       <article><span>Incompletas</span><strong class="incomplete">${school.incomplete}</strong></article>
       <article><span>Completitud</span><strong>${formatPct(school.completePct)}</strong></article>
     </section>
-    <section class="modal-years">${Object.values(school.roles.student.years).map((year) => `
+    ${activePopulation === "students" ? `<section class="modal-years">${Object.values(school.roles.student.years).map((year) => `
       <article class="modal-year">
         <div class="modal-year-heading"><strong>${year.year}.º año</strong><span>${year.total} respuestas</span></div>
         <div class="modal-year-bar"><i style="width:${year.completePct}%"></i></div>
         <div class="modal-year-counts"><span><b class="complete">${year.complete}</b> completas</span><span><b class="incomplete">${year.incomplete}</b> incompletas</span></div>
         <strong class="modal-year-pct">${formatPct(year.completePct)}</strong>
-      </article>`).join("")}</section>`;
+      </article>`).join("")}</section>` : ""}`;
   dialog.showModal();
 }
 
@@ -443,6 +463,7 @@ function renderMonitoring(): void {
   const view = document.querySelector<HTMLElement>("#monitoring-view");
   if (!view || !data) return;
   const rows = sortedMonitoringRows(data.monitoringRows);
+  const schoolQuestion = activePopulation === "teachers" ? "¿En qué escuela trabajás?" : "¿A qué escuela vas?";
   view.innerHTML = `
     <section class="monitoring-panel panel">
       <div class="monitoring-heading section-heading">
@@ -450,12 +471,12 @@ function renderMonitoring(): void {
         <span>${formatNumber(rows.length)} registros</span>
       </div>
       ${rows.length ? `<div class="monitoring-table-wrap"><table class="monitoring-table">
-        <thead><tr>${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("¿A qué escuela vas?", "school")}${sortHeader("ID escuela", "schoolIdentifier")}${sortHeader("Gestión", "managementType")}${sortHeader("Año de secundaria", "courseYear")}${sortHeader("Encuesta completa", "complete")}</tr></thead>
+        <thead><tr>${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader(schoolQuestion, "school")}${sortHeader("ID escuela", "schoolIdentifier")}${sortHeader("Gestión", "managementType")}${sortHeader("Año de secundaria", "courseYear")}${sortHeader("Encuesta completa", "complete")}</tr></thead>
         <tbody>${rows.map((row) => `<tr>
           <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.school)}</td>
           <td>${escapeHtml(row.schoolIdentifier)}</td>
           <td><span class="management-badge ${row.managementType}">${managementLabel(row.managementType)}</span></td>
-          <td>${row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`}</td>
+          <td>${activePopulation === "students" ? (row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`) : "No aplica"}</td>
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "SI" : "NO"}</span></td>
         </tr>`).join("")}</tbody>
       </table></div>` : `<div class="monitoring-empty"><strong>Sin cargas registradas</strong><p>Los resultados de ${POPULATION_LABELS[activePopulation].toLocaleLowerCase("es-AR")} se mostrarán aquí cuando la encuesta esté conectada.</p></div>`}
@@ -613,7 +634,9 @@ function renderLegend(): void {
     { type: "private", label: "Escuelas secundarias (G. Privadas)", shape: "▥", schools: data.schools.filter((school) => school.managementType === "private" && schoolLocationForSummary(school)) },
   ];
   const summary = document.querySelector<HTMLElement>("#legend-summary");
-  if (summary) summary.textContent = `${data.mapPoints.length} puntos de matrícula · ${surveyedSchools().length} escuelas encuestadas ubicadas`;
+  if (summary) summary.textContent = activePopulation === "students"
+    ? `${data.mapPoints.length} puntos de matrícula · ${surveyedSchools().length} escuelas encuestadas ubicadas`
+    : `${data.mapPoints.length} ubicaciones individuales · ${surveyedSchools().length} escuelas encuestadas ubicadas`;
   legend.innerHTML = groups.map((group) => {
     const ids = group.schools.map(schoolIdForSummary);
     const checked = ids.length > 0 && ids.every((id) => selectedSchoolIds.has(id));
@@ -764,7 +787,8 @@ function renderMapStatus(): void {
   if (!status || !data) return;
   const visible = visibleMapPoints().length;
   const missingCoordinates = data.summary.total - data.mapPoints.length;
-  status.textContent = `${visible} de ${data.mapPoints.length} puntos de matrícula visibles · ${surveyedSchools().length} escuelas encuestadas ubicadas · ${data.summary.total} respuestas recibidas (${data.summary.complete} completas y ${data.summary.incomplete} incompletas) · ${missingCoordinates} sin coordenadas válidas`;
+  const pointLabel = activePopulation === "students" ? "puntos de matrícula" : "ubicaciones individuales";
+  status.textContent = `${visible} de ${data.mapPoints.length} ${pointLabel} visibles · ${surveyedSchools().length} escuelas encuestadas ubicadas · ${data.summary.total} respuestas recibidas (${data.summary.complete} completas y ${data.summary.incomplete} incompletas) · ${missingCoordinates} sin coordenadas válidas`;
 }
 
 function colorFor(school: string): string {

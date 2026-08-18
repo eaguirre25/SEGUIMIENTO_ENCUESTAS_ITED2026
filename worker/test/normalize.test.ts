@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildDashboard, detectCompletion, normalizeSchool, parseCourseYear, parseSchoolNumber, splitTimestamp } from "../src/normalize";
 import { decodeExport, LimeSurveyClient } from "../src/limesurvey";
-import { DASHBOARD_EXPORT_FIELDS, QUESTION_MAP } from "../src/question-map";
+import {
+  DASHBOARD_EXPORT_FIELDS,
+  QUESTION_MAP,
+  TEACHER_DASHBOARD_EXPORT_FIELDS,
+  TEACHER_QUESTION_MAP,
+} from "../src/question-map";
 import type { QuestionMap } from "../src/normalize";
 
 const map: QuestionMap = {
@@ -24,6 +29,12 @@ describe("normalización", () => {
     expect(QUESTION_MAP.PRIVATE_SCHOOL).toBe("Q996592");
     expect(DASHBOARD_EXPORT_FIELDS).toContain("977929X336X3191");
     expect(DASHBOARD_EXPORT_FIELDS).toContain("977929X337X3250SQ003");
+  });
+
+  it("mapea los campos verificados de la encuesta docente activa", () => {
+    expect(TEACHER_QUESTION_MAP.SCHOOL).toBe("ESCUELAMAYOR");
+    expect(TEACHER_QUESTION_MAP.COMPLETION).toBe("submitdate");
+    expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toContain("284898X404X4428");
   });
 
   it("decodifica la estructura JSON exportada sin asumir QCodes", () => {
@@ -119,6 +130,23 @@ describe("normalización", () => {
   it("extrae únicamente cursos 1 a 7", () => {
     expect(parseCourseYear("3.º año")).toBe(3);
     expect(parseCourseYear("8")).toBeNull();
+  });
+
+  it("reconoce como estatal una escuela docente informada sólo por número", () => {
+    const teacherMap: QuestionMap = {
+      ...map,
+      SCHOOL: "teacher_school",
+      MANAGEMENT_TYPE: null,
+    };
+    const result = buildDashboard([
+      { teacher_school: "33", submitdate: null },
+    ], "284898", teacherMap);
+    expect(result.schools[0]).toMatchObject({
+      school: "EES 33",
+      schoolNumber: 33,
+      managementType: "state",
+      total: 1,
+    });
   });
 
   it("pide a LimeSurvey únicamente los campos necesarios", async () => {

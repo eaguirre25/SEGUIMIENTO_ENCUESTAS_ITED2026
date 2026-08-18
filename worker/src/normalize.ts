@@ -118,15 +118,21 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
   schoolNumber: number | null;
   managementType: ManagementType;
 } | null {
-  const managementType = normalizeManagementType(map.MANAGEMENT_TYPE ? readMappedValue(raw, map.MANAGEMENT_TYPE) : null);
+  let managementType = normalizeManagementType(map.MANAGEMENT_TYPE ? readMappedValue(raw, map.MANAGEMENT_TYPE) : null);
   const stateSchoolValue = map.STATE_SCHOOL ? readMappedValue(raw, map.STATE_SCHOOL) : null;
   const privateSchoolValue = map.PRIVATE_SCHOOL ? readMappedValue(raw, map.PRIVATE_SCHOOL) : null;
   const isStateSchool = managementType === "state";
-  const schoolNumber = isStateSchool ? parseStateSchoolNumber(stateSchoolValue) : null;
-  const mappedSchoolValue = isStateSchool
+  let schoolNumber = isStateSchool ? parseStateSchoolNumber(stateSchoolValue) : null;
+  let mappedSchoolValue = isStateSchool
     ? (schoolNumber === null ? stateSchoolValue : `EES ${schoolNumber}`)
     : managementType === "private" ? privateSchoolValue : (map.SCHOOL ? readMappedValue(raw, map.SCHOOL) : null);
-  const school = normalizeSchool(mappedSchoolValue);
+  let school = normalizeSchool(mappedSchoolValue);
+  if (managementType === "unknown" && school?.original.match(/^EES \d+$/)) {
+    managementType = "state";
+    schoolNumber = parseSchoolNumber(school.original);
+    mappedSchoolValue = schoolNumber === null ? mappedSchoolValue : `EES ${schoolNumber}`;
+    school = normalizeSchool(mappedSchoolValue);
+  }
   if (!school) return null;
   return { school, schoolNumber, managementType };
 }

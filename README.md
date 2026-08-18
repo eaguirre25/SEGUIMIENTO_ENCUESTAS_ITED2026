@@ -194,6 +194,7 @@ En Cloudflare Pages también puede conectarse GitHub usando `frontend` como raí
 | `DASHBOARD_USERNAME` | secreto | Cloudflare Secret | usuario del visor |
 | `DASHBOARD_PASSWORD` | secreto | Cloudflare Secret | contraseña del visor |
 | `LIMESURVEY_STUDENT_SURVEY_ID` | variable | `wrangler.jsonc` | `977929` |
+| `LIMESURVEY_TEACHER_SURVEY_ID` | variable | `wrangler.jsonc` | `284898` |
 | `DASHBOARD_ALLOWED_ORIGIN` | variable | `wrangler.jsonc` | origen exacto del frontend |
 | `VITE_DATA_MODE` | build frontend | `.env.local`/CI | `demo` o `api` |
 | `VITE_API_BASE_URL` | build frontend | `.env.local`/CI | URL del Worker |
@@ -202,7 +203,7 @@ Las variables que empiezan por `VITE_` son públicas por diseño; nunca colocar 
 
 ## Contrato y privacidad
 
-`GET /api/dashboard` exige autenticación y solo entrega fecha de generación, ID de encuesta, agregados por escuela y las coordenadas mínimas necesarias para representar la matrícula. No devuelve ID individual, domicilio, edad, género, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela continúan contando en el total general y pueden verse como puntos sin escuela identificada cuando tienen coordenadas válidas.
+`GET /api/dashboard?population=students` y `GET /api/dashboard?population=teachers` exigen autenticación y solo entregan fecha de generación, ID de encuesta, agregados por escuela y las coordenadas mínimas necesarias para el panel. Si se omite `population`, se conserva Estudiantes como valor predeterminado. No se devuelve ID individual, domicilio, edad, género, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela continúan contando en el total general.
 
 El mapa conserva los puntos de matrícula en sus coordenadas informadas y muestra únicamente establecimientos con encuestas aplicadas y ubicación institucional comprobada. Cada escuela se representa con un ícono de edificio; los hilos relacionan la matrícula con su escuela y el mapa de calor transforma los puntos de matrícula visibles.
 
@@ -220,14 +221,14 @@ npm run build
 
 Las pruebas cubren normalización de escuela, completitud, cursos 1–7, porcentajes, coordenadas, contrato final, privacidad y la identidad `completas + incompletas = total`.
 
-## Cómo agregar docentes, conducción y familias
+## Docentes conectados y cómo agregar familias
 
-La salida ya anida métricas bajo `roles.student`. Para sumar nuevas encuestas sin rehacer el panel:
+La encuesta `284898`, destinada a docentes y equipos de conducción, ya está conectada mediante `population=teachers`. Para sumar Familias sin rehacer el panel:
 
-1. Añadir IDs no sensibles por rol en `Env` y `wrangler.jsonc`.
+1. Añadir el ID no sensible en `Env` y `wrangler.jsonc`.
 2. Crear un mapa de QCodes por encuesta con la misma semántica (`SCHOOL`, completitud y coordenadas cuando existan).
 3. Extraer cada encuesta con una sesión RPC gestionada por el mismo cliente.
-4. Generalizar `buildDashboard` para recibir el rol y acumular en `roles.teacher`, `roles.leadership` o `roles.family`.
+4. Generar una caché independiente para la nueva población.
 5. Mantener como clave común el nombre normalizado hasta disponer de identificador institucional; luego migrar a `SCHOOL_IDENTIFIER`.
 6. Añadir las secciones de rol al detalle de escuela. El mapa debe continuar exponiendo únicamente escuela y coordenadas.
 

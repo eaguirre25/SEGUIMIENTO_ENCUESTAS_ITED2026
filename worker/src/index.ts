@@ -1,10 +1,15 @@
 import { LimeSurveyClient } from "./limesurvey";
 import { buildDashboard } from "./normalize";
-import { DASHBOARD_EXPORT_FIELDS } from "./question-map";
+import {
+  DASHBOARD_EXPORT_FIELDS,
+  QUESTION_MAP,
+  TEACHER_DASHBOARD_EXPORT_FIELDS,
+  TEACHER_QUESTION_MAP,
+} from "./question-map";
 import type { Env } from "./types";
 
-const CACHE_ROW_ID = 1;
 const DASHBOARD_TIME_ZONE = "America/Argentina/Buenos_Aires";
+type DashboardPopulation = "students" | "teachers";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -23,16 +28,19 @@ export default {
     try {
       assertEnv(env);
       if (!(await isAuthorized(request, env))) return unauthorized(cors);
+      const population = parsePopulation(url.searchParams.get("population"));
+      if (!population) return jsonError("Población no válida", 400, cors);
+      const config = surveyConfig(population, env);
       const forceRefresh = url.searchParams.get("refresh") === "1";
       const refreshPaused = isDashboardRefreshPaused(Date.now());
       if (!forceRefresh || refreshPaused) {
-        const cached = await readCachedDashboard(env);
+        const cached = await readCachedDashboard(env, population);
         if (cached) return jsonText(cached, 200, cors, refreshPaused ? "D1-PAUSED" : "D1");
         if (refreshPaused) {
           return jsonError("La actualización está pausada fuera del horario operativo", 503, cors);
         }
       }
-      const fresh = await refreshDashboard(env);
+      const fresh = await refreshDashboard(env, population);
       return jsonText(fresh, 200, cors, forceRefresh ? "REFRESH" : "SEED");
     } catch (error) {
       console.error(JSON.stringify({ message: "dashboard request failed", error: errorMessage(error) }));
@@ -49,10 +57,12 @@ export default {
       }));
       return;
     }
-    ctx.waitUntil(refreshDashboard(env).then(
-      () => console.log(JSON.stringify({ message: "dashboard cache refreshed" })),
-      (error) => console.error(JSON.stringify({ message: "dashboard refresh failed", error: errorMessage(error) })),
-    ));
+    for (const population of ["students", "teachers"] as const) {
+      ctx.waitUntil(refreshDashboard(env, population).then(
+        () => console.log(JSON.stringify({ message: "dashboard cache refreshed", population })),
+        (error) => console.error(JSON.stringify({ message: "dashboard refresh failed", population, error: errorMessage(error) })),
+      ));
+    }
   },
 } satisfies ExportedHandler<Env>;
 
@@ -69,28 +79,47 @@ export function isDashboardRefreshPaused(timestamp: number): boolean {
   return weekend || hour >= 23 || hour < 8;
 }
 
-async function readCachedDashboard(env: Env): Promise<string | null> {
+async function readCachedDashboard(env: Env, population: DashboardPopulation): Promise<string | null> {
   const row = await env.DASHBOARD_DB.prepare(
-    "SELECT payload FROM dashboard_cache WHERE id = ?1",
-  ).bind(CACHE_ROW_ID).first<{ payload: string }>();
+    "SELECT payload FROM dashboard_population_cache WHERE population = ?1",
+  ).bind(population).first<{ payload: string }>();
   return row?.payload ?? null;
 }
 
-async function refreshDashboard(env: Env): Promise<string> {
-  const surveyId = env.LIMESURVEY_STUDENT_SURVEY_ID;
+async function refreshDashboard(env: Env, population: DashboardPopulation): Promise<string> {
+  const config = surveyConfig(population, env);
   const client = new LimeSurveyClient(
     env.LIMESURVEY_RPC_URL,
     env.LIMESURVEY_USERNAME,
     env.LIMESURVEY_PASSWORD,
   );
-  const raw = await client.exportAllResponses(Number(surveyId), DASHBOARD_EXPORT_FIELDS);
-  const serialized = JSON.stringify(buildDashboard(raw, surveyId));
+  const raw = await client.exportAllResponses(Number(config.surveyId), config.exportFields);
+  const serialized = JSON.stringify(buildDashboard(raw, config.surveyId, config.questionMap));
   await env.DASHBOARD_DB.prepare(`
-    INSERT INTO dashboard_cache (id, payload, updated_at)
+    INSERT INTO dashboard_population_cache (population, payload, updated_at)
     VALUES (?1, ?2, datetime('now'))
-    ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at
-  `).bind(CACHE_ROW_ID, serialized).run();
+    ON CONFLICT(population) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at
+  `).bind(population, serialized).run();
   return serialized;
+}
+
+function parsePopulation(value: string | null): DashboardPopulation | null {
+  if (value === null || value === "" || value === "students") return "students";
+  return value === "teachers" ? "teachers" : null;
+}
+
+function surveyConfig(population: DashboardPopulation, env: Env) {
+  return population === "students"
+    ? {
+        surveyId: env.LIMESURVEY_STUDENT_SURVEY_ID,
+        questionMap: QUESTION_MAP,
+        exportFields: DASHBOARD_EXPORT_FIELDS,
+      }
+    : {
+        surveyId: env.LIMESURVEY_TEACHER_SURVEY_ID,
+        questionMap: TEACHER_QUESTION_MAP,
+        exportFields: TEACHER_DASHBOARD_EXPORT_FIELDS,
+      };
 }
 
 function errorMessage(error: unknown): string {
@@ -103,6 +132,7 @@ function assertEnv(env: Env): void {
     "LIMESURVEY_USERNAME",
     "LIMESURVEY_PASSWORD",
     "LIMESURVEY_STUDENT_SURVEY_ID",
+    "LIMESURVEY_TEACHER_SURVEY_ID",
     "DASHBOARD_ALLOWED_ORIGIN",
     "DASHBOARD_USERNAME",
     "DASHBOARD_PASSWORD",
@@ -110,7 +140,9 @@ function assertEnv(env: Env): void {
   ];
   const missing = required.filter((key) => !env[key]);
   if (missing.length) throw new Error(`Falta configuración requerida: ${missing.join(", ")}`);
-  if (!/^\d+$/.test(env.LIMESURVEY_STUDENT_SURVEY_ID)) throw new Error("Survey ID inválido");
+  for (const surveyId of [env.LIMESURVEY_STUDENT_SURVEY_ID, env.LIMESURVEY_TEACHER_SURVEY_ID]) {
+    if (!/^\d+$/.test(surveyId)) throw new Error("Survey ID inválido");
+  }
 }
 
 function corsHeaders(origin: string | null, allowed: string): Headers | undefined {

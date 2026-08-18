@@ -32,3 +32,28 @@ export const DASHBOARD_EXPORT_FIELDS = [
   "977929X337X3250SQ002",
   "977929X337X3250SQ003",
 ] as const;
+
+/**
+ * Encuesta activa de docentes y equipos de conducción (284898).
+ * Los QCodes y nombres internos fueron verificados contra el formulario
+ * público de LimeSurvey el 2026-08-18.
+ */
+export const TEACHER_QUESTION_MAP = {
+  SCHOOL: "ESCUELAMAYOR",
+  PRIVATE_SCHOOL: null,
+  STATE_SCHOOL: null,
+  SCHOOL_IDENTIFIER: null,
+  COURSE_YEAR: null,
+  LATITUDE: null,
+  LONGITUDE: null,
+  COMPLETION: "submitdate",
+  LOAD_TIMESTAMP: ["startdate", "datestamp", "submitdate"],
+  MANAGEMENT_TYPE: null,
+} as const satisfies Record<string, string | readonly string[] | null>;
+
+export const TEACHER_DASHBOARD_EXPORT_FIELDS = [
+  "submitdate",
+  "startdate",
+  "datestamp",
+  "284898X404X4428",
+] as const;

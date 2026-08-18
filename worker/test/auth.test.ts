@@ -7,6 +7,7 @@ const env: Env = {
   LIMESURVEY_USERNAME: "rpc-user",
   LIMESURVEY_PASSWORD: "rpc-password",
   LIMESURVEY_STUDENT_SURVEY_ID: "977929",
+  LIMESURVEY_TEACHER_SURVEY_ID: "284898",
   DASHBOARD_ALLOWED_ORIGIN: "https://example.github.io",
   DASHBOARD_USERNAME: "viewer",
   DASHBOARD_PASSWORD: "strong-password",
@@ -46,6 +47,15 @@ describe("protección del dashboard", () => {
     expect(allowedHeaders).toContain("Cache-Control");
     expect(allowedHeaders).toContain("Pragma");
     expect(response.headers.get("Access-Control-Max-Age")).toBe("86400");
+  });
+
+  it("rechaza poblaciones desconocidas antes de consultar datos", async () => {
+    const authorization = `Basic ${btoa("viewer:strong-password")}`;
+    const response = await worker.fetch(new Request("https://worker.example/api/dashboard?population=otra", {
+      headers: { Origin: env.DASHBOARD_ALLOWED_ORIGIN, Authorization: authorization },
+    }), env);
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Población no válida" });
   });
 });
 
