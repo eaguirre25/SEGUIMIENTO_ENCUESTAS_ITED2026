@@ -71,6 +71,35 @@ describe("normalización", () => {
     ]);
   });
 
+  it("consolida Alfonsina Storni dentro de la EES 6 sin alterar las respuestas", () => {
+    const surveyMap: QuestionMap = {
+      ...map,
+      MANAGEMENT_TYPE: "management",
+      STATE_SCHOOL: "state_school",
+      PRIVATE_SCHOOL: "private_school",
+      SCHOOL: ["private_school", "state_school"],
+      SCHOOL_IDENTIFIER: "school_identifier",
+    };
+    const result = buildDashboard([
+      { management: "Estatal", state_school: "EES 6", school_identifier: "6", submitdate: "2026-08-14" },
+      { management: "Estatal", state_school: "Alfonsina Storni", school_identifier: "ES6", submitdate: "2026-08-14" },
+      { management: "Estatal", state_school: "Alfonsina Storni", school_identifier: "99", submitdate: null },
+      { management: "Estatal", state_school: "Alfonsina Storni", school_identifier: "ES6", submitdate: "2026-08-14" },
+    ], "977929", surveyMap);
+
+    expect(result.summary).toMatchObject({ total: 4, complete: 3, incomplete: 1 });
+    expect(result.schools).toHaveLength(1);
+    expect(result.schools[0]).toMatchObject({
+      school: "EES 6",
+      schoolNumber: 6,
+      managementType: "state",
+      total: 4,
+      complete: 3,
+      incomplete: 1,
+    });
+    expect(result.monitoringRows.filter((row) => row.school === "Alfonsina Storni")).toHaveLength(3);
+  });
+
   it("toma la primera rama de escuela informada", () => {
     const branchedMap: QuestionMap = { ...map, SCHOOL: ["school_choice", "school_other"] };
     const result = buildDashboard(

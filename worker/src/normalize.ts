@@ -21,6 +21,10 @@ const EXCLUDED_TEST_RESPONSE_KEYS = new Set([
   "2026-08-11|22:09:20|sin informar|sin informar|unknown||incomplete",
 ]);
 
+const STATE_SCHOOL_NUMBER_ALIASES: Readonly<Record<string, number>> = {
+  "alfonsina storni": 6,
+};
+
 export function normalizeSchool(value: unknown): { original: string; key: string } | null {
   if (typeof value !== "string") return null;
   const cleaned = value.trim().replace(/\s+/g, " ");
@@ -34,12 +38,7 @@ export function normalizeSchool(value: unknown): { original: string; key: string
 
 function canonicalSchoolLabel(value: string): string {
   if (!value) return value;
-  const folded = value
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLocaleLowerCase("es-AR")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  const folded = foldSchoolText(value);
   const schoolNumber = parseSchoolNumber(folded);
   if (schoolNumber === null) return value;
   const number = String(schoolNumber);
@@ -54,6 +53,22 @@ export function parseSchoolNumber(value: unknown): number | null {
   if (!matches || matches.length !== 1) return null;
   const parsed = Number(matches[0]);
   return Number.isInteger(parsed) && parsed >= 1 && parsed <= 99 ? parsed : null;
+}
+
+function parseStateSchoolNumber(value: unknown): number | null {
+  const parsed = parseSchoolNumber(value);
+  if (parsed !== null) return parsed;
+  if (typeof value !== "string") return null;
+  return STATE_SCHOOL_NUMBER_ALIASES[foldSchoolText(value)] ?? null;
+}
+
+function foldSchoolText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLocaleLowerCase("es-AR")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 export function detectCompletion(raw: RawResponse, field = "submitdate"): boolean {
@@ -107,7 +122,7 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
   const stateSchoolValue = map.STATE_SCHOOL ? readMappedValue(raw, map.STATE_SCHOOL) : null;
   const privateSchoolValue = map.PRIVATE_SCHOOL ? readMappedValue(raw, map.PRIVATE_SCHOOL) : null;
   const isStateSchool = managementType === "state";
-  const schoolNumber = isStateSchool ? parseSchoolNumber(stateSchoolValue) : null;
+  const schoolNumber = isStateSchool ? parseStateSchoolNumber(stateSchoolValue) : null;
   const mappedSchoolValue = isStateSchool
     ? (schoolNumber === null ? stateSchoolValue : `EES ${schoolNumber}`)
     : managementType === "private" ? privateSchoolValue : (map.SCHOOL ? readMappedValue(raw, map.SCHOOL) : null);
