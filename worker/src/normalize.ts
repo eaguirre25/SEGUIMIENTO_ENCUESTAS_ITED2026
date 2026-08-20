@@ -10,7 +10,7 @@ import type {
   SchoolSummary,
 } from "./types";
 
-type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL";
+type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL" | "ROLE";
 export type QuestionMap = Omit<Record<keyof typeof QUESTION_MAP, string | readonly string[] | null>, OptionalSchoolBranch>
   & Partial<Record<OptionalSchoolBranch, string | readonly string[] | null>>;
 
@@ -118,14 +118,15 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
   schoolNumber: number | null;
   managementType: ManagementType;
 } | null {
-  let managementType = normalizeManagementType(map.MANAGEMENT_TYPE ? readMappedValue(raw, map.MANAGEMENT_TYPE) : null);
-  const stateSchoolValue = map.STATE_SCHOOL ? readMappedValue(raw, map.STATE_SCHOOL) : null;
-  const privateSchoolValue = map.PRIVATE_SCHOOL ? readMappedValue(raw, map.PRIVATE_SCHOOL) : null;
+  let managementType = normalizeManagementType(readSemanticValue(raw, map.MANAGEMENT_TYPE, isManagementAnswer));
+  const genericSchoolValue = map.SCHOOL ? readMappedValue(raw, map.SCHOOL) : null;
+  const stateSchoolValue = map.STATE_SCHOOL ? readMappedValue(raw, map.STATE_SCHOOL) : genericSchoolValue;
+  const privateSchoolValue = map.PRIVATE_SCHOOL ? readMappedValue(raw, map.PRIVATE_SCHOOL) : genericSchoolValue;
   const isStateSchool = managementType === "state";
   let schoolNumber = isStateSchool ? parseStateSchoolNumber(stateSchoolValue) : null;
   let mappedSchoolValue = isStateSchool
     ? (schoolNumber === null ? stateSchoolValue : `EES ${schoolNumber}`)
-    : managementType === "private" ? privateSchoolValue : (map.SCHOOL ? readMappedValue(raw, map.SCHOOL) : null);
+    : managementType === "private" ? privateSchoolValue : genericSchoolValue;
   let school = normalizeSchool(mappedSchoolValue);
   if (managementType === "unknown" && school?.original.match(/^EES \d+$/)) {
     managementType = "state";
@@ -286,10 +287,32 @@ function toMonitoringRow(raw: RawResponse, map: QuestionMap): LoadMonitoringRow 
     time: timestamp.time,
     school: schoolAnswerAsReceived(raw, map),
     schoolIdentifier: answerAsReceived(map.SCHOOL_IDENTIFIER ? readMappedValue(raw, map.SCHOOL_IDENTIFIER) : null),
+    role: answerAsReceived(readSemanticValue(raw, map.ROLE, isTeacherRoleAnswer)),
     managementType: identity?.managementType ?? "unknown",
     courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
     complete: detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
   };
+}
+
+function readSemanticValue(
+  raw: RawResponse,
+  fields: string | readonly string[] | null | undefined,
+  matches: (value: unknown) => boolean,
+): unknown {
+  if (!fields) return null;
+  const mapped = fields ? readMappedValue(raw, fields) : null;
+  if (mapped !== null) return mapped;
+  return Object.values(raw).find(matches) ?? null;
+}
+
+function isManagementAnswer(value: unknown): boolean {
+  return normalizeManagementType(value) !== "unknown";
+}
+
+function isTeacherRoleAnswer(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR");
+  return /\b(docente|directiv|director|conduccion|preceptor|orientador|bibliotecari|coordinador)\b/.test(normalized);
 }
 
 function monitoringRowKey(row: LoadMonitoringRow): string {

@@ -57,7 +57,7 @@ type SchoolLocation = StateSchool | PrivateSchool;
 type Population = "students" | "teachers" | "families";
 type DashboardView = "tracking" | "map" | "monitoring";
 type MonitoringRow = DashboardPayload["monitoringRows"][number];
-type MonitoringSortKey = "date" | "time" | "school" | "schoolIdentifier" | "managementType" | "courseYear" | "complete";
+type MonitoringSortKey = "date" | "time" | "school" | "schoolIdentifier" | "role" | "managementType" | "courseYear" | "complete";
 
 const POPULATION_LABELS: Record<Population, string> = {
   students: "ESTUDIANTES",
@@ -335,6 +335,9 @@ function selectPopulation(population: Population): void {
   if (brandLabel) brandLabel.textContent = `ITED 2026 · ENCUESTA A ${POPULATION_LABELS[population]}`;
   const pointsMode = document.querySelector<HTMLElement>("#points-mode");
   if (pointsMode) pointsMode.textContent = population === "students" ? "Matrícula" : "Respuestas";
+  const mapTab = document.querySelector<HTMLButtonElement>('[data-tab="map"]');
+  mapTab?.classList.toggle("hidden", population !== "students");
+  if (population !== "students" && !document.querySelector("#map-view")?.classList.contains("hidden")) switchTab("tracking");
   closeSchoolModal();
   render();
 }
@@ -463,7 +466,10 @@ function renderMonitoring(): void {
   const view = document.querySelector<HTMLElement>("#monitoring-view");
   if (!view || !data) return;
   const rows = sortedMonitoringRows(data.monitoringRows);
-  const schoolQuestion = activePopulation === "teachers" ? "¿En qué escuela trabajás?" : "¿A qué escuela vas?";
+  const teacherGrid = activePopulation === "teachers";
+  const headers = teacherGrid
+    ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Rol", "role")}${sortHeader("Escuela por la que responde (mayor carga horaria)", "school")}${sortHeader("Gestión estatal o privada", "managementType")}${sortHeader("Encuesta completa o incompleta", "complete")}`
+    : `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("¿A qué escuela vas?", "school")}${sortHeader("ID escuela", "schoolIdentifier")}${sortHeader("Gestión", "managementType")}${sortHeader("Año de secundaria", "courseYear")}${sortHeader("Encuesta completa", "complete")}`;
   view.innerHTML = `
     <section class="monitoring-panel panel">
       <div class="monitoring-heading section-heading">
@@ -471,12 +477,14 @@ function renderMonitoring(): void {
         <span>${formatNumber(rows.length)} registros</span>
       </div>
       ${rows.length ? `<div class="monitoring-table-wrap"><table class="monitoring-table">
-        <thead><tr>${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader(schoolQuestion, "school")}${sortHeader("ID escuela", "schoolIdentifier")}${sortHeader("Gestión", "managementType")}${sortHeader("Año de secundaria", "courseYear")}${sortHeader("Encuesta completa", "complete")}</tr></thead>
-        <tbody>${rows.map((row) => `<tr>
-          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.school)}</td>
-          <td>${escapeHtml(row.schoolIdentifier)}</td>
+        <thead><tr>${headers}</tr></thead>
+        <tbody>${rows.map((row) => teacherGrid ? `<tr>
+          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.role)}</td><td>${escapeHtml(row.school)}</td>
           <td><span class="management-badge ${row.managementType}">${managementLabel(row.managementType)}</span></td>
-          <td>${activePopulation === "students" ? (row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`) : "No aplica"}</td>
+          <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "COMPLETA" : "INCOMPLETA"}</span></td>
+        </tr>` : `<tr>
+          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.school)}</td><td>${escapeHtml(row.schoolIdentifier)}</td>
+          <td><span class="management-badge ${row.managementType}">${managementLabel(row.managementType)}</span></td><td>${row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`}</td>
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "SI" : "NO"}</span></td>
         </tr>`).join("")}</tbody>
       </table></div>` : `<div class="monitoring-empty"><strong>Sin cargas registradas</strong><p>Los resultados de ${POPULATION_LABELS[activePopulation].toLocaleLowerCase("es-AR")} se mostrarán aquí cuando la encuesta esté conectada.</p></div>`}
