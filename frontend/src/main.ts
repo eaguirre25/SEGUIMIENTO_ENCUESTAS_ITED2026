@@ -468,7 +468,7 @@ function renderMonitoring(): void {
   const rows = sortedMonitoringRows(data.monitoringRows);
   const teacherGrid = activePopulation === "teachers";
   const headers = teacherGrid
-    ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Rol", "role")}${sortHeader("Escuela por la que responde (mayor carga horaria)", "school")}${sortHeader("Gestión estatal o privada", "managementType")}${sortHeader("Encuesta completa o incompleta", "complete")}`
+    ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Rol", "role")}${sortHeader("Escuela con mayor carga horaria", "school")}${sortHeader("Encuesta completa o incompleta", "complete")}`
     : `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("¿A qué escuela vas?", "school")}${sortHeader("ID escuela", "schoolIdentifier")}${sortHeader("Gestión", "managementType")}${sortHeader("Año de secundaria", "courseYear")}${sortHeader("Encuesta completa", "complete")}`;
   view.innerHTML = `
     <section class="monitoring-panel panel">
@@ -480,7 +480,6 @@ function renderMonitoring(): void {
         <thead><tr>${headers}</tr></thead>
         <tbody>${rows.map((row) => teacherGrid ? `<tr>
           <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.role || "Sin informar")}</td><td>${escapeHtml(row.school)}</td>
-          <td><span class="management-badge ${row.managementType}">${managementLabel(row.managementType)}</span></td>
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "COMPLETA" : "INCOMPLETA"}</span></td>
         </tr>` : `<tr>
           <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.school)}</td><td>${escapeHtml(row.schoolIdentifier)}</td>

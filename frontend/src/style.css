@@ -121,6 +121,9 @@ main { max-width: 1540px; margin: auto; padding: clamp(20px, 3vw, 46px) clamp(16
 .monitoring-table th:nth-child(5), .monitoring-table td:nth-child(5) { width: 135px; }
 .monitoring-table th:nth-child(6), .monitoring-table td:nth-child(6) { width: 180px; }
 .monitoring-table th:nth-child(7), .monitoring-table td:nth-child(7) { width: 210px; text-align: center; }
+body[data-population="teachers"] .monitoring-table th:nth-child(3), body[data-population="teachers"] .monitoring-table td:nth-child(3) { width: 220px; }
+body[data-population="teachers"] .monitoring-table th:nth-child(4), body[data-population="teachers"] .monitoring-table td:nth-child(4) { width: auto; }
+body[data-population="teachers"] .monitoring-table th:nth-child(5), body[data-population="teachers"] .monitoring-table td:nth-child(5) { width: 220px; text-align: center; }
 .management-badge { display: inline-grid; min-width: 88px; padding: 4px 10px; border: 1px solid #566176; border-radius: 8px; color: #cdd4df; background: #ffffff08; font-size: 15px; font-weight: 700; text-align: center; }
 .management-badge.state { border-color: #22d3ee55; color: #67e8f9; background: #22d3ee10; }
 .management-badge.private { border-color: #f472b655; color: #f9a8d4; background: #f472b610; }
@@ -277,6 +280,7 @@ body, button, input, .brand p, .eyebrow, .sync, .tab-count, .live-badge,
   .tabs { gap: 13px; overflow-x: auto; }
   .tab { flex: 0 0 auto; }
   .monitoring-table { min-width: 1130px; }
+  body[data-population="teachers"] .monitoring-table { min-width: 850px; }
 }
 @media (max-width: 480px) {
   .header-logo { width: 48px; height: 48px; margin-left: 0; }

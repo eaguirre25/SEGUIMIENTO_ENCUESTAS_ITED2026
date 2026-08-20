@@ -10,7 +10,7 @@ import type {
   SchoolSummary,
 } from "./types";
 
-type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL" | "ROLE";
+type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL" | "ROLE" | "ROLE_OTHER";
 export type QuestionMap = Omit<Record<keyof typeof QUESTION_MAP, string | readonly string[] | null>, OptionalSchoolBranch>
   & Partial<Record<OptionalSchoolBranch, string | readonly string[] | null>>;
 
@@ -158,10 +158,24 @@ function normalizeManagementType(value: unknown): ManagementType {
 
 function readMappedValue(raw: RawResponse, fields: string | readonly string[]): unknown {
   for (const field of typeof fields === "string" ? [fields] : fields) {
-    const value = raw[field];
+    const exactValue = raw[field];
+    if (exactValue !== null && exactValue !== undefined && String(exactValue).trim() !== "") return exactValue;
+    const matchingEntry = Object.entries(raw).find(([key, value]) => (
+      keyMatchesQuestionCode(key, field)
+      && value !== null
+      && value !== undefined
+      && String(value).trim() !== ""
+    ));
+    const value = matchingEntry?.[1];
     if (value !== null && value !== undefined && String(value).trim() !== "") return value;
   }
   return null;
+}
+
+function keyMatchesQuestionCode(key: string, questionCode: string): boolean {
+  if (!key.toLocaleUpperCase("es-AR").startsWith(questionCode.toLocaleUpperCase("es-AR"))) return false;
+  const boundary = key.charAt(questionCode.length);
+  return boundary === "" || /[\s.:[\]-]/.test(boundary);
 }
 
 function firstField(fields: string | readonly string[] | null): string | null {
@@ -287,11 +301,22 @@ function toMonitoringRow(raw: RawResponse, map: QuestionMap): LoadMonitoringRow 
     time: timestamp.time,
     school: schoolAnswerAsReceived(raw, map),
     schoolIdentifier: answerAsReceived(map.SCHOOL_IDENTIFIER ? readMappedValue(raw, map.SCHOOL_IDENTIFIER) : null),
-    role: answerAsReceived(readSemanticValue(raw, map.ROLE, isTeacherRoleAnswer)),
+    role: teacherRoleAsReceived(raw, map),
     managementType: identity?.managementType ?? "unknown",
     courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
     complete: detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
   };
+}
+
+function teacherRoleAsReceived(raw: RawResponse, map: QuestionMap): string {
+  const role = readSemanticValue(raw, map.ROLE, isTeacherRoleAnswer);
+  if (role === null || role === undefined || String(role).trim() === "") return "Sin informar";
+  const label = String(role).trim().replace(/\s*\[[^\]]+\]\s*$/, "");
+  if (/^otro(?:\/a)?$/i.test(label) && map.ROLE_OTHER) {
+    const otherRole = readMappedValue(raw, map.ROLE_OTHER);
+    if (otherRole !== null) return `Otro: ${String(otherRole).trim()}`;
+  }
+  return label;
 }
 
 function readSemanticValue(

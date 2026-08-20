@@ -34,7 +34,8 @@ describe("normalización", () => {
   it("mapea los campos verificados de la encuesta docente activa", () => {
     expect(TEACHER_QUESTION_MAP.SCHOOL).toBe("ESCUELAMAYOR");
     expect(TEACHER_QUESTION_MAP.COMPLETION).toBe("submitdate");
-    expect(TEACHER_QUESTION_MAP.ROLE).toContain("ROL");
+    expect(TEACHER_QUESTION_MAP.ROLE).toBe("ROL");
+    expect(TEACHER_QUESTION_MAP.ROLE_OTHER).toBe("ROLOTRO");
     expect(TEACHER_QUESTION_MAP.MANAGEMENT_TYPE).toContain("GESTION");
     expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toBeUndefined();
   });
@@ -247,8 +248,8 @@ describe("agregación segura", () => {
   it("arma la grilla docente con los campos propios y sin coordenadas", () => {
     const result = buildDashboard([{
       startdate: "2026-08-19 10:15:30",
-      ROL: "Director/a",
-      ESCUELAMAYOR: "EES 4",
+      "ROL - Para comenzar, seleccioná el rol que cumplís en la institución.": "Director/a [DIR]",
+      "ESCUELAMAYOR - ¿Cuál es la escuela en la que tenés mayor carga horaria?": "EESN 4",
       GESTION: "Estatal",
       submitdate: "2026-08-19 10:20:00",
     }], "985318", TEACHER_QUESTION_MAP);
@@ -256,13 +257,27 @@ describe("agregación segura", () => {
       date: "2026-08-19",
       time: "10:15:30",
       role: "Director/a",
-      school: "EES 4",
+      school: "EESN 4",
       schoolIdentifier: "Sin informar",
       managementType: "state",
       courseYear: null,
       complete: true,
     }]);
     expect(result.mapPoints).toEqual([]);
+  });
+
+  it("muestra el cargo escrito cuando la respuesta de rol es Otro", () => {
+    const result = buildDashboard([{
+      startdate: "2026-08-19 11:00:00",
+      ROL: "Otro [OTRO]",
+      ROLOTRO: "Director CENS y profesor",
+      ESCUELAMAYOR: "CENS 455",
+      submitdate: null,
+    }], "985318", TEACHER_QUESTION_MAP);
+    expect(result.monitoringRows[0]).toMatchObject({
+      role: "Otro: Director CENS y profesor",
+      school: "CENS 455",
+    });
   });
 
   it("excluye las cuatro respuestas de prueba de todos los indicadores", () => {

@@ -50,7 +50,8 @@ export const TEACHER_QUESTION_MAP = {
   COMPLETION: "submitdate",
   LOAD_TIMESTAMP: ["startdate", "datestamp", "submitdate"],
   MANAGEMENT_TYPE: ["GESTION", "TIPOGESTION", "GESTIONESCUELA", "GESTIONMAYOR"],
-  ROLE: ["ROL", "CARGO", "FUNCION", "ROLINSTITUCIONAL"],
+  ROLE: "ROL",
+  ROLE_OTHER: "ROLOTRO",
 } as const satisfies Record<string, string | readonly string[] | null>;
 
 // La encuesta docente se exporta completa porque LimeSurvey sólo acepta nombres
