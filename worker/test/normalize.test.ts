@@ -32,10 +32,11 @@ describe("normalización", () => {
   });
 
   it("mapea los campos verificados de la encuesta docente activa", () => {
-    expect(TEACHER_QUESTION_MAP.SCHOOL).toBe("ESCUELAMAYOR");
+    expect(TEACHER_QUESTION_MAP.SCHOOL).toContain("ESCUELAMAYOR");
+    expect(TEACHER_QUESTION_MAP.SCHOOL).toContain("985318X456X5372");
     expect(TEACHER_QUESTION_MAP.COMPLETION).toBe("submitdate");
-    expect(TEACHER_QUESTION_MAP.ROLE).toBe("ROL");
-    expect(TEACHER_QUESTION_MAP.ROLE_OTHER).toBe("ROLOTRO");
+    expect(TEACHER_QUESTION_MAP.ROLE).toContain("985318X456X5370");
+    expect(TEACHER_QUESTION_MAP.ROLE_OTHER).toContain("985318X456X5426");
     expect(TEACHER_QUESTION_MAP.MANAGEMENT_TYPE).toContain("GESTION");
     expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toBeUndefined();
   });
@@ -277,6 +278,19 @@ describe("agregación segura", () => {
     expect(result.monitoringRows[0]).toMatchObject({
       role: "Otro: Director CENS y profesor",
       school: "CENS 455",
+    });
+  });
+
+  it("lee los nombres internos que LimeSurvey entrega al Worker", () => {
+    const result = buildDashboard([{
+      startdate: "2026-08-20 10:10:08",
+      "985318X456X5370": "Docente [DOC]",
+      "985318X456X5372": "EESN 4",
+      submitdate: "2026-08-20 10:20:00",
+    }], "985318", TEACHER_QUESTION_MAP);
+    expect(result.monitoringRows[0]).toMatchObject({
+      role: "Docente",
+      school: "EESN 4",
     });
   });
 

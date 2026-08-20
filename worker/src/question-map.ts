@@ -40,7 +40,7 @@ export const DASHBOARD_EXPORT_FIELDS = [
  * público de LimeSurvey el 2026-08-18.
  */
 export const TEACHER_QUESTION_MAP = {
-  SCHOOL: "ESCUELAMAYOR",
+  SCHOOL: ["ESCUELAMAYOR", "985318X456X5372"],
   PRIVATE_SCHOOL: null,
   STATE_SCHOOL: null,
   SCHOOL_IDENTIFIER: null,
@@ -50,8 +50,8 @@ export const TEACHER_QUESTION_MAP = {
   COMPLETION: "submitdate",
   LOAD_TIMESTAMP: ["startdate", "datestamp", "submitdate"],
   MANAGEMENT_TYPE: ["GESTION", "TIPOGESTION", "GESTIONESCUELA", "GESTIONMAYOR"],
-  ROLE: "ROL",
-  ROLE_OTHER: "ROLOTRO",
+  ROLE: ["ROL", "985318X456X5370"],
+  ROLE_OTHER: ["ROLOTRO", "985318X456X5426"],
 } as const satisfies Record<string, string | readonly string[] | null>;
 
 // La encuesta docente se exporta completa porque LimeSurvey sólo acepta nombres
