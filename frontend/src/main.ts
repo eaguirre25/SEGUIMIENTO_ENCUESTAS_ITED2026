@@ -479,7 +479,7 @@ function renderMonitoring(): void {
       ${rows.length ? `<div class="monitoring-table-wrap"><table class="monitoring-table">
         <thead><tr>${headers}</tr></thead>
         <tbody>${rows.map((row) => teacherGrid ? `<tr>
-          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.role)}</td><td>${escapeHtml(row.school)}</td>
+          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.role || "Sin informar")}</td><td>${escapeHtml(row.school)}</td>
           <td><span class="management-badge ${row.managementType}">${managementLabel(row.managementType)}</span></td>
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "COMPLETA" : "INCOMPLETA"}</span></td>
         </tr>` : `<tr>

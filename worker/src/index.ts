@@ -34,7 +34,7 @@ export default {
       const forceRefresh = url.searchParams.get("refresh") === "1";
       const refreshPaused = isDashboardRefreshPaused(Date.now());
       if (!forceRefresh || refreshPaused) {
-        const cached = await readCachedDashboard(env, population);
+        const cached = await readCachedDashboard(env, population, config.surveyId);
         if (cached) return jsonText(cached, 200, cors, refreshPaused ? "D1-PAUSED" : "D1");
         if (refreshPaused) {
           return jsonError("La actualización está pausada fuera del horario operativo", 503, cors);
@@ -79,11 +79,21 @@ export function isDashboardRefreshPaused(timestamp: number): boolean {
   return weekend || hour >= 23 || hour < 8;
 }
 
-async function readCachedDashboard(env: Env, population: DashboardPopulation): Promise<string | null> {
+async function readCachedDashboard(
+  env: Env,
+  population: DashboardPopulation,
+  expectedSurveyId: string,
+): Promise<string | null> {
   const row = await env.DASHBOARD_DB.prepare(
     "SELECT payload FROM dashboard_population_cache WHERE population = ?1",
   ).bind(population).first<{ payload: string }>();
-  return row?.payload ?? null;
+  if (!row?.payload) return null;
+  try {
+    const cached = JSON.parse(row.payload) as { surveyId?: unknown };
+    return cached.surveyId === expectedSurveyId ? row.payload : null;
+  } catch {
+    return null;
+  }
 }
 
 async function refreshDashboard(env: Env, population: DashboardPopulation): Promise<string> {
