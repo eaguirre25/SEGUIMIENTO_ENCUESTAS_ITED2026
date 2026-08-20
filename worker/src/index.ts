@@ -104,9 +104,6 @@ async function refreshDashboard(env: Env, population: DashboardPopulation): Prom
     env.LIMESURVEY_PASSWORD,
   );
   const raw = await client.exportAllResponses(Number(config.surveyId), config.exportFields);
-  if (population === "teachers") {
-    console.log(JSON.stringify({ message: "teacher export schema", fields: Object.keys(raw[0] ?? {}) }));
-  }
   const serialized = JSON.stringify(buildDashboard(raw, config.surveyId, config.questionMap));
   await env.DASHBOARD_DB.prepare(`
     INSERT INTO dashboard_population_cache (population, payload, updated_at)
