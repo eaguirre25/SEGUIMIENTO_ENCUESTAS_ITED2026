@@ -54,7 +54,13 @@ export const TEACHER_QUESTION_MAP = {
   ROLE_OTHER: ["ROLOTRO", "985318X456X5426"],
 } as const satisfies Record<string, string | readonly string[] | null>;
 
-// La encuesta docente se exporta completa porque LimeSurvey sólo acepta nombres
-// internos en aFields y los códigos de rol/gestión pueden cambiar al editarla.
-// buildDashboard conserva únicamente los seis campos de monitoreo requeridos.
-export const TEACHER_DASHBOARD_EXPORT_FIELDS = undefined;
+// LimeSurvey exige nombres internos en aFields. Pedirlos explícitamente evita
+// que la exportación remota devuelva sólo metadatos y omita las respuestas.
+export const TEACHER_DASHBOARD_EXPORT_FIELDS = [
+  "submitdate",
+  "startdate",
+  "datestamp",
+  "985318X456X5370",
+  "985318X456X5426",
+  "985318X456X5372",
+] as const;

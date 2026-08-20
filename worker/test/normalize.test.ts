@@ -38,7 +38,9 @@ describe("normalización", () => {
     expect(TEACHER_QUESTION_MAP.ROLE).toContain("985318X456X5370");
     expect(TEACHER_QUESTION_MAP.ROLE_OTHER).toContain("985318X456X5426");
     expect(TEACHER_QUESTION_MAP.MANAGEMENT_TYPE).toContain("GESTION");
-    expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toBeUndefined();
+    expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toContain("985318X456X5370");
+    expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toContain("985318X456X5426");
+    expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toContain("985318X456X5372");
   });
 
   it("decodifica la estructura JSON exportada sin asumir QCodes", () => {
@@ -265,6 +267,31 @@ describe("agregación segura", () => {
       complete: true,
     }]);
     expect(result.mapPoints).toEqual([]);
+  });
+
+  it("pide explícitamente a LimeSurvey los campos docentes", async () => {
+    const calls: Array<{ method: string; params: unknown[] }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => {
+      const request = JSON.parse(String(init.body)) as { id: number; method: string; params: unknown[] };
+      calls.push(request);
+      const result = request.method === "get_session_key"
+        ? "session-key"
+        : request.method === "export_responses"
+          ? btoa(JSON.stringify({ responses: [] }))
+          : "OK";
+      return Response.json({ id: request.id, result });
+    }));
+    try {
+      const client = new LimeSurveyClient("https://example.invalid/rpc", "user", "password");
+      await client.exportAllResponses(985318, TEACHER_DASHBOARD_EXPORT_FIELDS);
+      expect(calls[1].params[9]).toEqual(expect.arrayContaining([
+        "985318X456X5370",
+        "985318X456X5426",
+        "985318X456X5372",
+      ]));
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("muestra el cargo escrito cuando la respuesta de rol es Otro", () => {
