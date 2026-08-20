@@ -14,6 +14,7 @@ export const QUESTION_MAP = {
   COMPLETION: "submitdate",
   LOAD_TIMESTAMP: ["startdate", "datestamp", "submitdate"],
   MANAGEMENT_TYPE: "Q996591",
+  ROLE: null,
 } as const satisfies Record<string, string | readonly string[] | null>;
 
 /**
@@ -34,7 +35,7 @@ export const DASHBOARD_EXPORT_FIELDS = [
 ] as const;
 
 /**
- * Encuesta activa de docentes y equipos de conducción (284898).
+ * Encuesta activa de docentes y equipos de conducción (985318).
  * Los QCodes y nombres internos fueron verificados contra el formulario
  * público de LimeSurvey el 2026-08-18.
  */
@@ -48,12 +49,11 @@ export const TEACHER_QUESTION_MAP = {
   LONGITUDE: null,
   COMPLETION: "submitdate",
   LOAD_TIMESTAMP: ["startdate", "datestamp", "submitdate"],
-  MANAGEMENT_TYPE: null,
+  MANAGEMENT_TYPE: ["GESTION", "TIPOGESTION", "GESTIONESCUELA", "GESTIONMAYOR"],
+  ROLE: ["ROL", "CARGO", "FUNCION", "ROLINSTITUCIONAL"],
 } as const satisfies Record<string, string | readonly string[] | null>;
 
-export const TEACHER_DASHBOARD_EXPORT_FIELDS = [
-  "submitdate",
-  "startdate",
-  "datestamp",
-  "284898X404X4428",
-] as const;
+// La encuesta docente se exporta completa porque LimeSurvey sólo acepta nombres
+// internos en aFields y los códigos de rol/gestión pueden cambiar al editarla.
+// buildDashboard conserva únicamente los seis campos de monitoreo requeridos.
+export const TEACHER_DASHBOARD_EXPORT_FIELDS = undefined;

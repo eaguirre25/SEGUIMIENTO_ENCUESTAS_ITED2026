@@ -7,7 +7,7 @@
   "triggers": { "crons": ["* * * * *"] },
   "vars": {
     "LIMESURVEY_STUDENT_SURVEY_ID": "977929",
-    "LIMESURVEY_TEACHER_SURVEY_ID": "284898",
+    "LIMESURVEY_TEACHER_SURVEY_ID": "985318",
     "DASHBOARD_ALLOWED_ORIGIN": "http://localhost:5173"
   },
   "env": {
@@ -23,7 +23,7 @@
       ],
       "vars": {
         "LIMESURVEY_STUDENT_SURVEY_ID": "977929",
-        "LIMESURVEY_TEACHER_SURVEY_ID": "284898",
+        "LIMESURVEY_TEACHER_SURVEY_ID": "985318",
         "DASHBOARD_ALLOWED_ORIGIN": "https://eaguirre25.github.io"
       }
     }

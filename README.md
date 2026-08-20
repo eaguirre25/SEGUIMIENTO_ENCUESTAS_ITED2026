@@ -194,7 +194,7 @@ En Cloudflare Pages también puede conectarse GitHub usando `frontend` como raí
 | `DASHBOARD_USERNAME` | secreto | Cloudflare Secret | usuario del visor |
 | `DASHBOARD_PASSWORD` | secreto | Cloudflare Secret | contraseña del visor |
 | `LIMESURVEY_STUDENT_SURVEY_ID` | variable | `wrangler.jsonc` | `977929` |
-| `LIMESURVEY_TEACHER_SURVEY_ID` | variable | `wrangler.jsonc` | `284898` |
+| `LIMESURVEY_TEACHER_SURVEY_ID` | variable | `wrangler.jsonc` | `985318` |
 | `DASHBOARD_ALLOWED_ORIGIN` | variable | `wrangler.jsonc` | origen exacto del frontend |
 | `VITE_DATA_MODE` | build frontend | `.env.local`/CI | `demo` o `api` |
 | `VITE_API_BASE_URL` | build frontend | `.env.local`/CI | URL del Worker |
@@ -223,7 +223,7 @@ Las pruebas cubren normalización de escuela, completitud, cursos 1–7, porcent
 
 ## Docentes conectados y cómo agregar familias
 
-La encuesta `284898`, destinada a docentes y equipos de conducción, ya está conectada mediante `population=teachers`. Para sumar Familias sin rehacer el panel:
+La encuesta `985318`, destinada a docentes y equipos de conducción, ya está conectada mediante `population=teachers`. Para sumar Familias sin rehacer el panel:
 
 1. Añadir el ID no sensible en `Env` y `wrangler.jsonc`.
 2. Crear un mapa de QCodes por encuesta con la misma semántica (`SCHOOL`, completitud y coordenadas cuando existan).

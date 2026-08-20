@@ -34,7 +34,9 @@ describe("normalización", () => {
   it("mapea los campos verificados de la encuesta docente activa", () => {
     expect(TEACHER_QUESTION_MAP.SCHOOL).toBe("ESCUELAMAYOR");
     expect(TEACHER_QUESTION_MAP.COMPLETION).toBe("submitdate");
-    expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toContain("284898X404X4428");
+    expect(TEACHER_QUESTION_MAP.ROLE).toContain("ROL");
+    expect(TEACHER_QUESTION_MAP.MANAGEMENT_TYPE).toContain("GESTION");
+    expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toBeUndefined();
   });
 
   it("decodifica la estructura JSON exportada sin asumir QCodes", () => {
@@ -140,7 +142,7 @@ describe("normalización", () => {
     };
     const result = buildDashboard([
       { teacher_school: "33", submitdate: null },
-    ], "284898", teacherMap);
+    ], "985318", teacherMap);
     expect(result.schools[0]).toMatchObject({
       school: "EES 33",
       schoolNumber: 33,
@@ -236,10 +238,31 @@ describe("agregación segura", () => {
       { school: "  Colegio del Parque  ", school_identifier: "  PRIV-09  ", year: "3", management: "Privada", startdate: "2026-08-14 09:15:30", submitdate: "2026-08-14 09:20:00" },
     ], "977929", monitoringMap);
     expect(monitored.monitoringRows).toEqual([
-      { date: "2026-08-14", time: "09:15:30", school: "  Colegio del Parque  ", schoolIdentifier: "  PRIV-09  ", managementType: "private", courseYear: 3, complete: true },
-      { date: "2026-08-14", time: "08:05:00", school: "Media 1", schoolIdentifier: "ID-001", managementType: "state", courseYear: 1, complete: false },
+      { date: "2026-08-14", time: "09:15:30", school: "  Colegio del Parque  ", schoolIdentifier: "  PRIV-09  ", role: "Sin informar", managementType: "private", courseYear: 3, complete: true },
+      { date: "2026-08-14", time: "08:05:00", school: "Media 1", schoolIdentifier: "ID-001", role: "Sin informar", managementType: "state", courseYear: 1, complete: false },
     ]);
     expect(monitored.monitoringRows).toHaveLength(monitored.summary.total);
+  });
+
+  it("arma la grilla docente con los campos propios y sin coordenadas", () => {
+    const result = buildDashboard([{
+      startdate: "2026-08-19 10:15:30",
+      ROL: "Director/a",
+      ESCUELAMAYOR: "EES 4",
+      GESTION: "Estatal",
+      submitdate: "2026-08-19 10:20:00",
+    }], "985318", TEACHER_QUESTION_MAP);
+    expect(result.monitoringRows).toEqual([{
+      date: "2026-08-19",
+      time: "10:15:30",
+      role: "Director/a",
+      school: "EES 4",
+      schoolIdentifier: "Sin informar",
+      managementType: "state",
+      courseYear: null,
+      complete: true,
+    }]);
+    expect(result.mapPoints).toEqual([]);
   });
 
   it("excluye las cuatro respuestas de prueba de todos los indicadores", () => {
