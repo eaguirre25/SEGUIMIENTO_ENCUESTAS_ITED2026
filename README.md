@@ -195,6 +195,7 @@ En Cloudflare Pages también puede conectarse GitHub usando `frontend` como raí
 | `DASHBOARD_PASSWORD` | secreto | Cloudflare Secret | contraseña del visor |
 | `LIMESURVEY_STUDENT_SURVEY_ID` | variable | `wrangler.jsonc` | `977929` |
 | `LIMESURVEY_TEACHER_SURVEY_ID` | variable | `wrangler.jsonc` | `985318` |
+| `LIMESURVEY_FAMILY_SURVEY_ID` | variable | `wrangler.jsonc` | `997168` |
 | `DASHBOARD_ALLOWED_ORIGIN` | variable | `wrangler.jsonc` | origen exacto del frontend |
 | `VITE_DATA_MODE` | build frontend | `.env.local`/CI | `demo` o `api` |
 | `VITE_API_BASE_URL` | build frontend | `.env.local`/CI | URL del Worker |
@@ -203,7 +204,7 @@ Las variables que empiezan por `VITE_` son públicas por diseño; nunca colocar 
 
 ## Contrato y privacidad
 
-`GET /api/dashboard?population=students` y `GET /api/dashboard?population=teachers` exigen autenticación y solo entregan fecha de generación, ID de encuesta, agregados por escuela y las coordenadas mínimas necesarias para el panel. Si se omite `population`, se conserva Estudiantes como valor predeterminado. No se devuelve ID individual, domicilio, edad, género, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela continúan contando en el total general.
+`GET /api/dashboard?population=students`, `population=teachers` y `population=families` exigen autenticación. Solo entregan fecha de generación, ID de encuesta, agregados por escuela y los campos mínimos del seguimiento operativo. Si se omite `population`, se conserva Estudiantes como valor predeterminado. No se devuelve ID individual, domicilio, edad, género, composición del hogar, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela continúan contando en el total general.
 
 El mapa conserva los puntos de matrícula en sus coordenadas informadas y muestra únicamente establecimientos con encuestas aplicadas y ubicación institucional comprobada. Cada escuela se representa con un ícono de edificio; los hilos relacionan la matrícula con su escuela y el mapa de calor transforma los puntos de matrícula visibles.
 
@@ -221,15 +222,16 @@ npm run build
 
 Las pruebas cubren normalización de escuela, completitud, cursos 1–7, porcentajes, coordenadas, contrato final, privacidad y la identidad `completas + incompletas = total`.
 
-## Docentes conectados y cómo agregar familias
+## Poblaciones conectadas
 
-La encuesta `985318`, destinada a docentes y equipos de conducción, ya está conectada mediante `population=teachers`. Para sumar Familias sin rehacer el panel:
+El panel lee tres encuestas de LimeSurvey con cachés independientes:
 
-1. Añadir el ID no sensible en `Env` y `wrangler.jsonc`.
-2. Crear un mapa de QCodes por encuesta con la misma semántica (`SCHOOL`, completitud y coordenadas cuando existan).
-3. Extraer cada encuesta con una sesión RPC gestionada por el mismo cliente.
-4. Generar una caché independiente para la nueva población.
-5. Mantener como clave común el nombre normalizado hasta disponer de identificador institucional; luego migrar a `SCHOOL_IDENTIFIER`.
-6. Añadir las secciones de rol al detalle de escuela. El mapa debe continuar exponiendo únicamente escuela y coordenadas.
+- Estudiantes: `977929` (`population=students`).
+- Docentes y equipos de conducción: `985318` (`population=teachers`).
+- Familias: `997168` (`population=families`).
+
+Para Familias, el seguimiento muestra fecha, hora, vínculo con el/la estudiante, escuela informada, pertenencia a General San Martín, año y estado completa/incompleta. Si la escuela local se responde como un número o dentro de un texto inequívoco (por ejemplo, `13` o `Escuela 13`), se normaliza como `EES 13`. Cuando la familia indica que la escuela no pertenece a General San Martín, el nombre se conserva como fue informado y no se mezcla con una escuela local del mismo número.
+
+La exportación de Familias se limita a esos campos operativos. No incorpora edad, género, domicilio, composición del hogar ni respuestas abiertas.
 
 Este proyecto no modifica encuestas: todas las operaciones RemoteControl implementadas son de autenticación, lectura/exportación y cierre de sesión.

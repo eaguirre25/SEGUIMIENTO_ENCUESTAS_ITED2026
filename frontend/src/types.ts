@@ -36,6 +36,7 @@ export interface DashboardPayload {
     role: string;
     managementType: ManagementType;
     courseYear: number | null;
+    inSanMartin: boolean | null;
     complete: boolean;
   }>;
 }

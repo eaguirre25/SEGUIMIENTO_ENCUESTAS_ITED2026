@@ -10,7 +10,7 @@ import type {
   SchoolSummary,
 } from "./types";
 
-type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL" | "ROLE" | "ROLE_OTHER";
+type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL" | "ROLE" | "ROLE_OTHER" | "IN_SAN_MARTIN";
 export type QuestionMap = Omit<Record<keyof typeof QUESTION_MAP, string | readonly string[] | null>, OptionalSchoolBranch>
   & Partial<Record<OptionalSchoolBranch, string | readonly string[] | null>>;
 
@@ -26,8 +26,8 @@ const STATE_SCHOOL_NUMBER_ALIASES: Readonly<Record<string, number>> = {
 };
 
 export function normalizeSchool(value: unknown): { original: string; key: string } | null {
-  if (typeof value !== "string") return null;
-  const cleaned = value.trim().replace(/\s+/g, " ");
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const cleaned = String(value).trim().replace(/\s+/g, " ");
   const original = canonicalSchoolLabel(cleaned);
   if (!original) return null;
   return {
@@ -87,6 +87,16 @@ export function parseCourseYear(value: unknown): number | null {
   return match ? Number(match[1]) : null;
 }
 
+export function parseYesNo(value: unknown): boolean | null {
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR");
+  if (["si", "s", "yes", "y", "1", "true"].includes(normalized)) return true;
+  if (["no", "n", "0", "false"].includes(normalized)) return false;
+  return null;
+}
+
 export function parseCoordinate(value: unknown, kind: "lat" | "lon"): number | null {
   if (typeof value !== "number" && typeof value !== "string") return null;
   const parsed = Number(String(value).trim().replace(",", "."));
@@ -118,6 +128,7 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
   schoolNumber: number | null;
   managementType: ManagementType;
 } | null {
+  const inSanMartin = map.IN_SAN_MARTIN ? parseYesNo(readMappedValue(raw, map.IN_SAN_MARTIN)) : null;
   let managementType = normalizeManagementType(readSemanticValue(raw, map.MANAGEMENT_TYPE, isManagementAnswer));
   const genericSchoolValue = map.SCHOOL ? readMappedValue(raw, map.SCHOOL) : null;
   const stateSchoolValue = map.STATE_SCHOOL ? readMappedValue(raw, map.STATE_SCHOOL) : genericSchoolValue;
@@ -127,8 +138,8 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
   let mappedSchoolValue = isStateSchool
     ? (schoolNumber === null ? stateSchoolValue : `EES ${schoolNumber}`)
     : managementType === "private" ? privateSchoolValue : genericSchoolValue;
-  let school = normalizeSchool(mappedSchoolValue);
-  if (managementType === "unknown" && school?.original.match(/^EES \d+$/)) {
+  let school = inSanMartin === false ? normalizeExternalSchool(mappedSchoolValue) : normalizeSchool(mappedSchoolValue);
+  if (managementType === "unknown" && inSanMartin !== false && school?.original.match(/^EES \d+$/)) {
     managementType = "state";
     schoolNumber = parseSchoolNumber(school.original);
     mappedSchoolValue = schoolNumber === null ? mappedSchoolValue : `EES ${schoolNumber}`;
@@ -136,6 +147,16 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
   }
   if (!school) return null;
   return { school, schoolNumber, managementType };
+}
+
+function normalizeExternalSchool(value: unknown): { original: string; key: string } | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const original = String(value).trim().replace(/\s+/g, " ");
+  if (!original) return null;
+  return {
+    original,
+    key: `external:${original.normalize("NFKC").toLocaleLowerCase("es-AR")}`,
+  };
 }
 
 function schoolAnswerAsReceived(raw: RawResponse, map: QuestionMap): string {
@@ -304,6 +325,7 @@ function toMonitoringRow(raw: RawResponse, map: QuestionMap): LoadMonitoringRow 
     role: teacherRoleAsReceived(raw, map),
     managementType: identity?.managementType ?? "unknown",
     courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
+    inSanMartin: map.IN_SAN_MARTIN ? parseYesNo(readMappedValue(raw, map.IN_SAN_MARTIN)) : null,
     complete: detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
   };
 }
@@ -312,7 +334,7 @@ function teacherRoleAsReceived(raw: RawResponse, map: QuestionMap): string {
   const role = readSemanticValue(raw, map.ROLE, isTeacherRoleAnswer);
   if (role === null || role === undefined || String(role).trim() === "") return "Sin informar";
   const label = String(role).trim().replace(/\s*\[[^\]]+\]\s*$/, "");
-  if (/^otro(?:\/a)?$/i.test(label) && map.ROLE_OTHER) {
+  if (/^otro(?:\/a)?(?: vínculo)?$/i.test(label) && map.ROLE_OTHER) {
     const otherRole = readMappedValue(raw, map.ROLE_OTHER);
     if (otherRole !== null) return `Otro: ${String(otherRole).trim()}`;
   }

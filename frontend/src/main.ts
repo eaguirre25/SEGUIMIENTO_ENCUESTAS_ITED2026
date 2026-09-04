@@ -19,6 +19,7 @@ const COLORS = [
 let data: DashboardPayload | null = null;
 let studentData: DashboardPayload | null = null;
 let teacherData: DashboardPayload | null = null;
+let familyData: DashboardPayload | null = null;
 let activePopulation: Population = "students";
 let lastSuccessfulFetch = 0;
 let warning = "";
@@ -57,7 +58,7 @@ type SchoolLocation = StateSchool | PrivateSchool;
 type Population = "students" | "teachers" | "families";
 type DashboardView = "tracking" | "map" | "monitoring";
 type MonitoringRow = DashboardPayload["monitoringRows"][number];
-type MonitoringSortKey = "date" | "time" | "school" | "schoolIdentifier" | "role" | "managementType" | "courseYear" | "complete";
+type MonitoringSortKey = "date" | "time" | "school" | "schoolIdentifier" | "role" | "managementType" | "courseYear" | "inSanMartin" | "complete";
 
 const POPULATION_LABELS: Record<Population, string> = {
   students: "ESTUDIANTES",
@@ -115,7 +116,7 @@ app.innerHTML = `
     <div class="population-switcher" role="group" aria-label="Población de la encuesta">
       <button class="population-button active" data-population="students" type="button">Estudiantes <b id="students-count">0</b></button>
       <button class="population-button" data-population="teachers" type="button">Docentes <b id="teachers-count">0</b></button>
-      <button class="population-button" data-population="families" type="button">Familias <b>0</b></button>
+      <button class="population-button" data-population="families" type="button">Familias <b id="families-count">0</b></button>
     </div>
   </section>
   <nav class="tabs" aria-label="Vistas del panel">
@@ -184,13 +185,15 @@ async function refresh(): Promise<void> {
     return;
   }
   try {
-    const [students, teachers] = DATA_MODE === "demo"
-      ? [demoPayload(), emptyPayload()]
-      : await Promise.all([fetchApi("students"), fetchApi("teachers")]);
+    const [students, teachers, families] = DATA_MODE === "demo"
+      ? [demoPayload(), emptyPayload(), emptyPayload()]
+      : await Promise.all([fetchApi("students"), fetchApi("teachers"), fetchApi("families")]);
     validatePayload(students);
     validatePayload(teachers);
+    validatePayload(families);
     studentData = students;
     teacherData = teachers;
+    familyData = families;
     data = payloadForPopulation(activePopulation);
     lastSuccessfulFetch = Date.now();
     warning = "";
@@ -213,7 +216,7 @@ function demoPayload(): DashboardPayload {
   return { ...(structuredClone(demoData) as DashboardPayload), generatedAt: new Date().toISOString() };
 }
 
-async function fetchApi(population: "students" | "teachers" = "students"): Promise<DashboardPayload> {
+async function fetchApi(population: Population = "students"): Promise<DashboardPayload> {
   if (!API_BASE) throw new Error("El Worker de LimeSurvey todavía no está configurado");
   const response = await fetch(`${API_BASE}/api/dashboard?population=${population}`, {
     headers: { Accept: "application/json", Authorization: authHeader },
@@ -232,11 +235,17 @@ async function handleLogin(event: SubmitEvent): Promise<void> {
   const submit = document.querySelector<HTMLButtonElement>("#login-form button[type='submit']");
   if (submit) { submit.disabled = true; submit.textContent = "Verificando…"; }
   try {
-    const [students, teachers] = await Promise.all([fetchApi("students"), fetchApi("teachers")]);
+    const [students, teachers, families] = await Promise.all([
+      fetchApi("students"),
+      fetchApi("teachers"),
+      fetchApi("families"),
+    ]);
     validatePayload(students);
     validatePayload(teachers);
+    validatePayload(families);
     studentData = students;
     teacherData = teachers;
+    familyData = families;
     data = payloadForPopulation(activePopulation);
     lastSuccessfulFetch = Date.now();
     warning = "";
@@ -285,6 +294,7 @@ function logout(): void {
   data = null;
   studentData = null;
   teacherData = null;
+  familyData = null;
   sessionStorage.removeItem("dashboard-authorization");
   localStorage.removeItem("dashboard-authorization");
   showLogin();
@@ -305,7 +315,7 @@ function validatePayload(payload: DashboardPayload): void {
 function payloadForPopulation(population: Population): DashboardPayload | null {
   if (population === "students") return studentData;
   if (population === "teachers") return teacherData;
-  return emptyPayload();
+  return familyData;
 }
 
 function emptyPayload(): DashboardPayload {
@@ -391,6 +401,8 @@ function render(): void {
   if (studentsCount) studentsCount.textContent = String(studentData?.summary.total ?? 0);
   const teachersCount = document.querySelector<HTMLElement>("#teachers-count");
   if (teachersCount) teachersCount.textContent = String(teacherData?.summary.total ?? 0);
+  const familiesCount = document.querySelector<HTMLElement>("#families-count");
+  if (familiesCount) familiesCount.textContent = String(familyData?.summary.total ?? 0);
   renderMonitoring();
   renderLegend();
   renderMapStatus();
@@ -437,7 +449,9 @@ function openSchoolModal(schoolId: string): void {
   const name = escapeHtml(schoolDisplayName(school));
   const populationDescription = activePopulation === "students"
     ? "Estudiantes · seguimiento de respuestas por año"
-    : "Docentes y equipos de conducción · resumen de respuestas";
+    : activePopulation === "teachers"
+      ? "Docentes y equipos de conducción · resumen de respuestas"
+      : "Familias y responsables · seguimiento de respuestas por año";
   content.innerHTML = `
     <header class="modal-school-header">
       <div><p class="eyebrow">DETALLE DE LA ESCUELA</p><h2 id="school-modal-title"><i style="--school-color:${colorFor(school.school)}"></i>${name}</h2><p>${populationDescription}</p></div>
@@ -448,7 +462,7 @@ function openSchoolModal(schoolId: string): void {
       <article><span>Incompletas</span><strong class="incomplete">${school.incomplete}</strong></article>
       <article><span>Completitud</span><strong>${formatPct(school.completePct)}</strong></article>
     </section>
-    ${activePopulation === "students" ? `<section class="modal-years">${Object.values(school.roles.student.years).map((year) => `
+    ${activePopulation !== "teachers" ? `<section class="modal-years">${Object.values(school.roles.student.years).map((year) => `
       <article class="modal-year">
         <div class="modal-year-heading"><strong>${year.year}.º año</strong><span>${year.total} respuestas</span></div>
         <div class="modal-year-bar"><i style="width:${year.completePct}%"></i></div>
@@ -467,8 +481,11 @@ function renderMonitoring(): void {
   if (!view || !data) return;
   const rows = sortedMonitoringRows(data.monitoringRows);
   const teacherGrid = activePopulation === "teachers";
+  const familyGrid = activePopulation === "families";
   const headers = teacherGrid
     ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Rol", "role")}${sortHeader("Escuela con mayor carga horaria", "school")}${sortHeader("Encuesta completa o incompleta", "complete")}`
+    : familyGrid
+      ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Vínculo", "role")}${sortHeader("Escuela", "school")}${sortHeader("General San Martín", "inSanMartin")}${sortHeader("Año", "courseYear")}${sortHeader("Encuesta completa", "complete")}`
     : `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("¿A qué escuela vas?", "school")}${sortHeader("ID escuela", "schoolIdentifier")}${sortHeader("Gestión", "managementType")}${sortHeader("Año de secundaria", "courseYear")}${sortHeader("Encuesta completa", "complete")}`;
   view.innerHTML = `
     <section class="monitoring-panel panel">
@@ -481,6 +498,10 @@ function renderMonitoring(): void {
         <tbody>${rows.map((row) => teacherGrid ? `<tr>
           <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.role || "Sin informar")}</td><td>${escapeHtml(row.school)}</td>
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "COMPLETA" : "INCOMPLETA"}</span></td>
+        </tr>` : familyGrid ? `<tr>
+          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.role || "Sin informar")}</td><td>${escapeHtml(row.school)}</td>
+          <td>${row.inSanMartin === null ? "Sin informar" : row.inSanMartin ? "Sí" : "No"}</td><td>${row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`}</td>
+          <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "SI" : "NO"}</span></td>
         </tr>` : `<tr>
           <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.school)}</td><td>${escapeHtml(row.schoolIdentifier)}</td>
           <td><span class="management-badge ${row.managementType}">${managementLabel(row.managementType)}</span></td><td>${row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`}</td>
@@ -524,6 +545,7 @@ function sortedMonitoringRows(rows: MonitoringRow[]): MonitoringRow[] {
 function monitoringSortValue(row: MonitoringRow, key: MonitoringSortKey): string | number | null {
   if (key === "date") return `${row.date} ${row.time}`;
   if (key === "managementType") return managementLabel(row.managementType);
+  if (key === "inSanMartin") return row.inSanMartin === null ? null : row.inSanMartin ? 1 : 0;
   if (key === "complete") return row.complete ? 1 : 0;
   return row[key];
 }

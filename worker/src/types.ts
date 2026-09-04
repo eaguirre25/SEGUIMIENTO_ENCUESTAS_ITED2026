@@ -4,6 +4,7 @@ export interface Env {
   LIMESURVEY_PASSWORD: string;
   LIMESURVEY_STUDENT_SURVEY_ID: string;
   LIMESURVEY_TEACHER_SURVEY_ID: string;
+  LIMESURVEY_FAMILY_SURVEY_ID: string;
   DASHBOARD_ALLOWED_ORIGIN: string;
   DASHBOARD_USERNAME: string;
   DASHBOARD_PASSWORD: string;
@@ -69,6 +70,7 @@ export interface LoadMonitoringRow {
   role: string;
   managementType: ManagementType;
   courseYear: number | null;
+  inSanMartin: boolean | null;
   complete: boolean;
 }
 

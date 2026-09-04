@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildDashboard, detectCompletion, normalizeSchool, parseCourseYear, parseSchoolNumber, splitTimestamp } from "../src/normalize";
+import { buildDashboard, detectCompletion, normalizeSchool, parseCourseYear, parseSchoolNumber, parseYesNo, splitTimestamp } from "../src/normalize";
 import { decodeExport, LimeSurveyClient } from "../src/limesurvey";
 import {
   DASHBOARD_EXPORT_FIELDS,
+  FAMILY_DASHBOARD_EXPORT_FIELDS,
+  FAMILY_QUESTION_MAP,
   QUESTION_MAP,
   TEACHER_DASHBOARD_EXPORT_FIELDS,
   TEACHER_QUESTION_MAP,
@@ -43,6 +45,20 @@ describe("normalización", () => {
     expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toContain("985318X456X5372");
   });
 
+  it("mapea únicamente los campos operativos de la encuesta de familias", () => {
+    expect(FAMILY_QUESTION_MAP.SCHOOL).toEqual(expect.arrayContaining([
+      "ESCUELA",
+      "997168X472X5756",
+      "ESCUELAFUERA",
+      "997168X472X5802",
+    ]));
+    expect(FAMILY_QUESTION_MAP.ROLE).toContain("997168X472X5754");
+    expect(FAMILY_QUESTION_MAP.ROLE_OTHER).toContain("997168X472X5947");
+    expect(FAMILY_QUESTION_MAP.IN_SAN_MARTIN).toContain("997168X472X5755");
+    expect(FAMILY_QUESTION_MAP.COURSE_YEAR).toContain("997168X472X5757");
+    expect(FAMILY_DASHBOARD_EXPORT_FIELDS).not.toContain("997168X475X5782SQ001");
+  });
+
   it("decodifica la estructura JSON exportada sin asumir QCodes", () => {
     const encoded = btoa(JSON.stringify({ responses: [{ "17": { school: "EES 1", submitdate: null } }] }));
     expect(decodeExport(encoded)).toEqual([{ school: "EES 1", submitdate: null }]);
@@ -54,7 +70,7 @@ describe("normalización", () => {
   });
 
   it("consolida variantes inequívocas de escuelas numeradas", () => {
-    for (const variant of ["4", "EES4", "Media 4", "N°4", "Secundaria 4 Ricardo Rojas", "Escuela Número 4 Ricardo Rojas"]) {
+    for (const variant of [4, "4", "EES4", "Media 4", "N°4", "Secundaria 4 Ricardo Rojas", "Escuela Número 4 Ricardo Rojas"]) {
       expect(normalizeSchool(variant)?.original).toBe("EES 4");
     }
     expect(normalizeSchool("ees26")?.original).toBe("EES 26");
@@ -136,6 +152,14 @@ describe("normalización", () => {
   it("extrae únicamente cursos 1 a 7", () => {
     expect(parseCourseYear("3.º año")).toBe(3);
     expect(parseCourseYear("8")).toBeNull();
+  });
+
+  it("interpreta respuestas sí/no de LimeSurvey", () => {
+    expect(parseYesNo("Sí")).toBe(true);
+    expect(parseYesNo("Y")).toBe(true);
+    expect(parseYesNo("No")).toBe(false);
+    expect(parseYesNo("N")).toBe(false);
+    expect(parseYesNo("")).toBeNull();
   });
 
   it("reconoce como estatal una escuela docente informada sólo por número", () => {
@@ -242,8 +266,8 @@ describe("agregación segura", () => {
       { school: "  Colegio del Parque  ", school_identifier: "  PRIV-09  ", year: "3", management: "Privada", startdate: "2026-08-14 09:15:30", submitdate: "2026-08-14 09:20:00" },
     ], "977929", monitoringMap);
     expect(monitored.monitoringRows).toEqual([
-      { date: "2026-08-14", time: "09:15:30", school: "  Colegio del Parque  ", schoolIdentifier: "  PRIV-09  ", role: "Sin informar", managementType: "private", courseYear: 3, complete: true },
-      { date: "2026-08-14", time: "08:05:00", school: "Media 1", schoolIdentifier: "ID-001", role: "Sin informar", managementType: "state", courseYear: 1, complete: false },
+      { date: "2026-08-14", time: "09:15:30", school: "  Colegio del Parque  ", schoolIdentifier: "  PRIV-09  ", role: "Sin informar", managementType: "private", courseYear: 3, inSanMartin: null, complete: true },
+      { date: "2026-08-14", time: "08:05:00", school: "Media 1", schoolIdentifier: "ID-001", role: "Sin informar", managementType: "state", courseYear: 1, inSanMartin: null, complete: false },
     ]);
     expect(monitored.monitoringRows).toHaveLength(monitored.summary.total);
   });
@@ -264,6 +288,7 @@ describe("agregación segura", () => {
       schoolIdentifier: "Sin informar",
       managementType: "state",
       courseYear: null,
+      inSanMartin: null,
       complete: true,
     }]);
     expect(result.mapPoints).toEqual([]);
@@ -318,6 +343,59 @@ describe("agregación segura", () => {
     expect(result.monitoringRows[0]).toMatchObject({
       role: "Docente",
       school: "EESN 4",
+    });
+  });
+
+  it("arma el seguimiento de familias y reconoce el número de la escuela local", () => {
+    const result = buildDashboard([{
+      startdate: "2026-09-04 13:15:00",
+      "997168X472X5754": "Madre",
+      "997168X472X5755": "Sí",
+      "997168X472X5756": "Escuela 13",
+      "997168X472X5757": "3º año",
+      submitdate: "2026-09-04 13:20:00",
+    }], "997168", FAMILY_QUESTION_MAP);
+
+    expect(result.schools).toHaveLength(1);
+    expect(result.schools[0]).toMatchObject({
+      school: "EES 13",
+      schoolNumber: 13,
+      managementType: "state",
+      total: 1,
+    });
+    expect(result.monitoringRows[0]).toEqual({
+      date: "2026-09-04",
+      time: "13:15:00",
+      role: "Madre",
+      school: "Escuela 13",
+      schoolIdentifier: "Sin informar",
+      managementType: "state",
+      courseYear: 3,
+      inSanMartin: true,
+      complete: true,
+    });
+  });
+
+  it("no confunde una escuela externa numerada con una escuela local", () => {
+    const result = buildDashboard([{
+      startdate: "2026-09-04 14:00:00",
+      VINCULO: "Otro vínculo",
+      Q284042: "Tía",
+      SANMARTIN: "No",
+      ESCUELAFUERA: "Escuela 13",
+      ANIOEST: "2º año",
+      submitdate: null,
+    }], "997168", FAMILY_QUESTION_MAP);
+
+    expect(result.schools[0]).toMatchObject({
+      school: "Escuela 13",
+      schoolNumber: null,
+      managementType: "unknown",
+    });
+    expect(result.monitoringRows[0]).toMatchObject({
+      role: "Otro: Tía",
+      inSanMartin: false,
+      complete: false,
     });
   });
 

@@ -15,6 +15,8 @@ export const QUESTION_MAP = {
   LOAD_TIMESTAMP: ["startdate", "datestamp", "submitdate"],
   MANAGEMENT_TYPE: "Q996591",
   ROLE: null,
+  ROLE_OTHER: null,
+  IN_SAN_MARTIN: null,
 } as const satisfies Record<string, string | readonly string[] | null>;
 
 /**
@@ -52,6 +54,7 @@ export const TEACHER_QUESTION_MAP = {
   MANAGEMENT_TYPE: ["GESTION", "TIPOGESTION", "GESTIONESCUELA", "GESTIONMAYOR"],
   ROLE: ["ROL", "985318X456X5370"],
   ROLE_OTHER: ["ROLOTRO", "985318X456X5426"],
+  IN_SAN_MARTIN: null,
 } as const satisfies Record<string, string | readonly string[] | null>;
 
 // LimeSurvey exige nombres internos en aFields. Pedirlos explícitamente evita
@@ -63,4 +66,37 @@ export const TEACHER_DASHBOARD_EXPORT_FIELDS = [
   "985318X456X5370",
   "985318X456X5426",
   "985318X456X5372",
+] as const;
+
+/**
+ * Encuesta de familias y responsables (997168). Se exportan únicamente los
+ * campos necesarios para seguimiento de carga; quedan fuera las respuestas
+ * abiertas, los datos del hogar, la edad, el género y la ubicación declarada.
+ */
+export const FAMILY_QUESTION_MAP = {
+  SCHOOL: ["ESCUELA", "997168X472X5756", "ESCUELAFUERA", "997168X472X5802"],
+  PRIVATE_SCHOOL: null,
+  STATE_SCHOOL: null,
+  SCHOOL_IDENTIFIER: null,
+  COURSE_YEAR: ["ANIOEST", "997168X472X5757"],
+  LATITUDE: null,
+  LONGITUDE: null,
+  COMPLETION: "submitdate",
+  LOAD_TIMESTAMP: ["startdate", "datestamp", "submitdate"],
+  MANAGEMENT_TYPE: null,
+  ROLE: ["VINCULO", "997168X472X5754"],
+  ROLE_OTHER: ["Q284042", "997168X472X5947"],
+  IN_SAN_MARTIN: ["SANMARTIN", "997168X472X5755"],
+} as const satisfies Record<string, string | readonly string[] | null>;
+
+export const FAMILY_DASHBOARD_EXPORT_FIELDS = [
+  "submitdate",
+  "startdate",
+  "datestamp",
+  "997168X472X5754",
+  "997168X472X5947",
+  "997168X472X5755",
+  "997168X472X5756",
+  "997168X472X5802",
+  "997168X472X5757",
 ] as const;

@@ -2,6 +2,8 @@ import { LimeSurveyClient } from "./limesurvey";
 import { buildDashboard } from "./normalize";
 import {
   DASHBOARD_EXPORT_FIELDS,
+  FAMILY_DASHBOARD_EXPORT_FIELDS,
+  FAMILY_QUESTION_MAP,
   QUESTION_MAP,
   TEACHER_DASHBOARD_EXPORT_FIELDS,
   TEACHER_QUESTION_MAP,
@@ -9,7 +11,7 @@ import {
 import type { Env } from "./types";
 
 const DASHBOARD_TIME_ZONE = "America/Argentina/Buenos_Aires";
-type DashboardPopulation = "students" | "teachers";
+type DashboardPopulation = "students" | "teachers" | "families";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -57,7 +59,7 @@ export default {
       }));
       return;
     }
-    for (const population of ["students", "teachers"] as const) {
+    for (const population of ["students", "teachers", "families"] as const) {
       ctx.waitUntil(refreshDashboard(env, population).then(
         () => console.log(JSON.stringify({ message: "dashboard cache refreshed", population })),
         (error) => console.error(JSON.stringify({ message: "dashboard refresh failed", population, error: errorMessage(error) })),
@@ -115,21 +117,26 @@ async function refreshDashboard(env: Env, population: DashboardPopulation): Prom
 
 function parsePopulation(value: string | null): DashboardPopulation | null {
   if (value === null || value === "" || value === "students") return "students";
-  return value === "teachers" ? "teachers" : null;
+  if (value === "teachers" || value === "families") return value;
+  return null;
 }
 
 function surveyConfig(population: DashboardPopulation, env: Env) {
-  return population === "students"
-    ? {
-        surveyId: env.LIMESURVEY_STUDENT_SURVEY_ID,
-        questionMap: QUESTION_MAP,
-        exportFields: DASHBOARD_EXPORT_FIELDS,
-      }
-    : {
-        surveyId: env.LIMESURVEY_TEACHER_SURVEY_ID,
-        questionMap: TEACHER_QUESTION_MAP,
-        exportFields: TEACHER_DASHBOARD_EXPORT_FIELDS,
-      };
+  if (population === "students") return {
+    surveyId: env.LIMESURVEY_STUDENT_SURVEY_ID,
+    questionMap: QUESTION_MAP,
+    exportFields: DASHBOARD_EXPORT_FIELDS,
+  };
+  if (population === "teachers") return {
+    surveyId: env.LIMESURVEY_TEACHER_SURVEY_ID,
+    questionMap: TEACHER_QUESTION_MAP,
+    exportFields: TEACHER_DASHBOARD_EXPORT_FIELDS,
+  };
+  return {
+    surveyId: env.LIMESURVEY_FAMILY_SURVEY_ID,
+    questionMap: FAMILY_QUESTION_MAP,
+    exportFields: FAMILY_DASHBOARD_EXPORT_FIELDS,
+  };
 }
 
 function errorMessage(error: unknown): string {
@@ -143,6 +150,7 @@ function assertEnv(env: Env): void {
     "LIMESURVEY_PASSWORD",
     "LIMESURVEY_STUDENT_SURVEY_ID",
     "LIMESURVEY_TEACHER_SURVEY_ID",
+    "LIMESURVEY_FAMILY_SURVEY_ID",
     "DASHBOARD_ALLOWED_ORIGIN",
     "DASHBOARD_USERNAME",
     "DASHBOARD_PASSWORD",
@@ -150,7 +158,11 @@ function assertEnv(env: Env): void {
   ];
   const missing = required.filter((key) => !env[key]);
   if (missing.length) throw new Error(`Falta configuración requerida: ${missing.join(", ")}`);
-  for (const surveyId of [env.LIMESURVEY_STUDENT_SURVEY_ID, env.LIMESURVEY_TEACHER_SURVEY_ID]) {
+  for (const surveyId of [
+    env.LIMESURVEY_STUDENT_SURVEY_ID,
+    env.LIMESURVEY_TEACHER_SURVEY_ID,
+    env.LIMESURVEY_FAMILY_SURVEY_ID,
+  ]) {
     if (!/^\d+$/.test(surveyId)) throw new Error("Survey ID inválido");
   }
 }
