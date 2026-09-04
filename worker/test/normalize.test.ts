@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildDashboard, detectCompletion, normalizeSchool, parseCourseYear, parseSchoolNumber, parseYesNo, splitTimestamp } from "../src/normalize";
+import { buildDashboard, detectCompletion, normalizeGender, normalizeSchool, parseAgeGroup, parseCourseYear, parseSchoolNumber, parseYesNo, splitTimestamp } from "../src/normalize";
 import { decodeExport, LimeSurveyClient } from "../src/limesurvey";
 import {
   DASHBOARD_EXPORT_FIELDS,
@@ -31,6 +31,8 @@ describe("normalización", () => {
     expect(QUESTION_MAP.PRIVATE_SCHOOL).toBe("Q996592");
     expect(DASHBOARD_EXPORT_FIELDS).toContain("977929X336X3191");
     expect(DASHBOARD_EXPORT_FIELDS).toContain("977929X337X3250SQ003");
+    expect(DASHBOARD_EXPORT_FIELDS).toContain("977929X337X3228");
+    expect(DASHBOARD_EXPORT_FIELDS).toContain("977929X337X3183");
   });
 
   it("mapea los campos verificados de la encuesta docente activa", () => {
@@ -43,6 +45,8 @@ describe("normalización", () => {
     expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toContain("985318X456X5370");
     expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toContain("985318X456X5426");
     expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toContain("985318X456X5372");
+    expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toContain("985318X464X5397");
+    expect(TEACHER_DASHBOARD_EXPORT_FIELDS).toContain("985318X464X5396");
   });
 
   it("mapea únicamente los campos operativos de la encuesta de familias", () => {
@@ -57,6 +61,8 @@ describe("normalización", () => {
     expect(FAMILY_QUESTION_MAP.IN_SAN_MARTIN).toContain("997168X472X5755");
     expect(FAMILY_QUESTION_MAP.COURSE_YEAR).toContain("997168X472X5757");
     expect(FAMILY_DASHBOARD_EXPORT_FIELDS).not.toContain("997168X475X5782SQ001");
+    expect(FAMILY_DASHBOARD_EXPORT_FIELDS).toContain("997168X472X5779");
+    expect(FAMILY_DASHBOARD_EXPORT_FIELDS).toContain("997168X472X5778");
   });
 
   it("decodifica la estructura JSON exportada sin asumir QCodes", () => {
@@ -83,6 +89,33 @@ describe("normalización", () => {
     expect(parseSchoolNumber("EES6")).toBe(6);
     expect(parseSchoolNumber("Escuela 4 anexo 1")).toBeNull();
     expect(parseSchoolNumber("Santa Ana")).toBeNull();
+  });
+
+  it("agrupa edades válidas y conserva las categorías reales de género", () => {
+    expect(parseAgeGroup(15)).toBe("Hasta 15");
+    expect(parseAgeGroup("18")).toBe("16–18");
+    expect(parseAgeGroup(37)).toBe("30–39");
+    expect(parseAgeGroup(60)).toBe("60 o más");
+    expect(parseAgeGroup("sin dato")).toBeNull();
+    expect(parseAgeGroup(140)).toBeNull();
+    expect(normalizeGender("  Mujer [A001] ")).toBe("Mujer");
+
+    const demographicMap: QuestionMap = { ...map, AGE: "age", GENDER: "gender" };
+    const result = buildDashboard([
+      { school: "EES 4", age: "15", gender: "Mujer", submitdate: "2026-09-04" },
+      { school: "EES 4", age: 18, gender: "mujer", submitdate: null },
+      { school: "EES 5", age: "inválida", gender: "Varón", submitdate: "2026-09-04" },
+    ], "test", demographicMap);
+
+    expect(result.demographics).toEqual({
+      validAges: 2,
+      ageGroups: { "Hasta 15": 1, "16–18": 1, "19–29": 0, "30–39": 0, "40–49": 0, "50–59": 0, "60 o más": 0 },
+      validGenders: 3,
+      genders: [{ label: "Mujer", count: 2 }, { label: "Varón", count: 1 }],
+    });
+    expect(result.schools.find((school) => school.school === "EES 4")?.demographics.validAges).toBe(2);
+    expect(result.monitoringRows[0]).not.toHaveProperty("age");
+    expect(result.monitoringRows[0]).not.toHaveProperty("gender");
   });
 
   it("usa el número de la pregunta estatal como identidad de escuela", () => {

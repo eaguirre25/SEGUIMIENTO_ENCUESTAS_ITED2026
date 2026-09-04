@@ -277,12 +277,15 @@ body, button, input, .brand p, .eyebrow, .sync, .tab-count, .live-badge,
   .modal-stats { grid-template-columns: 1fr; }
   .modal-years { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .population-bar { align-items: flex-start; flex-direction: column; gap: 9px; }
+  .population-switcher { width: 100%; }
   .tabs { gap: 13px; overflow-x: auto; }
   .tab { flex: 0 0 auto; }
   .monitoring-table { min-width: 1130px; }
   body[data-population="teachers"] .monitoring-table { min-width: 850px; }
 }
 @media (max-width: 480px) {
+  .population-switcher { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .population-button { justify-content: center; min-width: 0; padding-inline: 9px; }
   .header-logo { width: 48px; height: 48px; margin-left: 0; }
   .brand p { display: none; } .brand h1 { font-size: 18px; }
   .sync { font-size: 9px; }

@@ -204,7 +204,7 @@ Las variables que empiezan por `VITE_` son públicas por diseño; nunca colocar 
 
 ## Contrato y privacidad
 
-`GET /api/dashboard?population=students`, `population=teachers` y `population=families` exigen autenticación. Solo entregan fecha de generación, ID de encuesta, agregados por escuela y los campos mínimos del seguimiento operativo. Si se omite `population`, se conserva Estudiantes como valor predeterminado. No se devuelve ID individual, domicilio, edad, género, composición del hogar, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela continúan contando en el total general.
+`GET /api/dashboard?population=students`, `population=teachers` y `population=families` exigen autenticación. Solo entregan fecha de generación, ID de encuesta, agregados por escuela y los campos mínimos del seguimiento operativo. Edad y género se procesan dentro del Worker y se entregan exclusivamente como rangos y cantidades agregadas, nunca asociados a una respuesta individual. Si se omite `population`, se conserva Estudiantes como valor predeterminado. No se devuelve ID individual, domicilio, edad exacta, género individual, composición del hogar, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela continúan contando en el total general.
 
 El mapa conserva los puntos de matrícula en sus coordenadas informadas y muestra únicamente establecimientos con encuestas aplicadas y ubicación institucional comprobada. Cada escuela se representa con un ícono de edificio; los hilos relacionan la matrícula con su escuela y el mapa de calor transforma los puntos de matrícula visibles.
 
@@ -230,8 +230,10 @@ El panel lee tres encuestas de LimeSurvey con cachés independientes:
 - Docentes y equipos de conducción: `985318` (`population=teachers`).
 - Familias: `997168` (`population=families`).
 
+La página inicial **Panorama general de la encuesta** combina esas tres cachés sin alterar las vistas específicas. Presenta totales, composición por población, respuestas por escuela y año, demografía agregada, cobertura y evolución temporal. Su filtro de escuela mantiene un estado independiente de los filtros de las vistas por población.
+
 Para Familias, el seguimiento muestra fecha, hora, vínculo con el/la estudiante, escuela informada, pertenencia a General San Martín, año y estado completa/incompleta. Si la escuela local se responde como un número o dentro de un texto inequívoco (por ejemplo, `13` o `Escuela 13`), se normaliza como `EES 13`. Cuando la familia indica que la escuela no pertenece a General San Martín, el nombre se conserva como fue informado y no se mezcla con una escuela local del mismo número.
 
-La exportación de Familias se limita a esos campos operativos. No incorpora edad, género, domicilio, composición del hogar ni respuestas abiertas.
+La exportación de Familias se limita a esos campos operativos y a edad/género para su agregación anónima en el Worker. No incorpora esos datos en las filas individuales, ni incorpora domicilio, composición del hogar o respuestas abiertas.
 
 Este proyecto no modifica encuestas: todas las operaciones RemoteControl implementadas son de autenticación, lectura/exportación y cierre de sesión.

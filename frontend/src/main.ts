@@ -1,11 +1,13 @@
 import maplibregl, { type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./style.css";
+import "./panorama.css";
 import demoData from "./data/demo.json";
 import stateSchoolsData from "./data/state-schools.json";
 import privateSchoolsData from "./data/private-schools.json";
 import unsamLogoUrl from "./assets/unsam_logo_3d.png";
 import type { DashboardPayload, ManagementType, SchoolSummary } from "./types";
+import { renderPanoramaGeneral } from "./panorama";
 
 const REFRESH_MS = 60_000;
 const DATA_MODE = import.meta.env.VITE_DATA_MODE ?? "api";
@@ -21,6 +23,8 @@ let studentData: DashboardPayload | null = null;
 let teacherData: DashboardPayload | null = null;
 let familyData: DashboardPayload | null = null;
 let activePopulation: Population = "students";
+let activeSection: "panorama" | "population" = "panorama";
+let activeDashboardView: DashboardView = "tracking";
 let lastSuccessfulFetch = 0;
 let warning = "";
 let map: maplibregl.Map | null = null;
@@ -105,27 +109,30 @@ const PRIVATE_SCHOOLS: PrivateSchool[] = privateSchoolsData.features.map((featur
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("No se encontró #app");
 document.body.dataset.population = activePopulation;
+document.body.dataset.section = activeSection;
 
 app.innerHTML = `
   <header class="topbar">
-    <div class="brand"><span class="brand-mark"></span><div><p id="brand-survey-label">ITED 2026 · ENCUESTA A ESTUDIANTES</p><h1>Seguimiento del trabajo de campo</h1></div><img class="header-logo" src="${unsamLogoUrl}" alt="Logo UNSAM"></div>
+    <div class="brand"><span class="brand-mark"></span><div><p id="brand-survey-label">ITED 2026 · PANORAMA GENERAL DE LA ENCUESTA</p><h1>Seguimiento del trabajo de campo</h1></div><img class="header-logo" src="${unsamLogoUrl}" alt="Logo UNSAM"></div>
     <div class="top-actions"><div class="sync"><span class="pulse"></span><span id="sync-label">Iniciando enlace…</span></div><button id="logout" class="logout hidden" type="button">Cerrar sesión</button></div>
   </header>
   <section class="population-bar" aria-labelledby="population-title">
-    <span id="population-title">Resultados de</span>
+    <span id="population-title">Vista</span>
     <div class="population-switcher" role="group" aria-label="Población de la encuesta">
-      <button class="population-button active" data-population="students" type="button">Estudiantes <b id="students-count">0</b></button>
+      <button id="panorama-button" class="population-button active" type="button">Panorama general</button>
+      <button class="population-button" data-population="students" type="button">Estudiantes <b id="students-count">0</b></button>
       <button class="population-button" data-population="teachers" type="button">Docentes <b id="teachers-count">0</b></button>
       <button class="population-button" data-population="families" type="button">Familias <b id="families-count">0</b></button>
     </div>
   </section>
-  <nav class="tabs" aria-label="Vistas del panel">
+  <nav id="population-tabs" class="tabs hidden" aria-label="Vistas del panel">
     <button class="tab active" data-tab="tracking">Seguimiento</button>
     <button class="tab" data-tab="map">Mapa <span id="map-count" class="tab-count">0</span></button>
     <button class="tab" data-tab="monitoring">Monitoreo de carga <span id="monitoring-count" class="tab-count">0</span></button>
   </nav>
   <main>
-    <section id="tracking-view" class="view"><div id="warning-slot"></div><div class="loading">Conectando con la fuente de datos…</div></section>
+    <section id="panorama-view" class="view"><div class="loading">Conectando con la fuente de datos…</div></section>
+    <section id="tracking-view" class="view hidden"><div id="warning-slot"></div><div class="loading">Conectando con la fuente de datos…</div></section>
     <section id="map-view" class="view hidden">
       <div class="map-shell">
         <aside class="map-legend"><div><p class="eyebrow">FILTROS DE ESCUELAS</p><h2>Escuelas encuestadas</h2><p id="legend-summary" class="legend-summary"></p></div><div id="legend-items"></div></aside>
@@ -163,8 +170,9 @@ app.querySelectorAll<HTMLButtonElement>(".tab").forEach((button) => {
   button.addEventListener("click", () => switchTab((button.dataset.tab as DashboardView) ?? "tracking"));
 });
 app.querySelectorAll<HTMLButtonElement>(".population-button").forEach((button) => {
-  button.addEventListener("click", () => selectPopulation(button.dataset.population as Population));
+  if (button.dataset.population) button.addEventListener("click", () => selectPopulation(button.dataset.population as Population));
 });
+document.querySelector<HTMLButtonElement>("#panorama-button")?.addEventListener("click", selectPanorama);
 document.querySelector<HTMLFormElement>("#login-form")?.addEventListener("submit", handleLogin);
 document.querySelector<HTMLButtonElement>("#logout")?.addEventListener("click", logout);
 document.querySelector<HTMLButtonElement>("#points-mode")?.addEventListener("click", () => setMapMode("points"));
@@ -213,7 +221,8 @@ async function refresh(): Promise<void> {
 }
 
 function demoPayload(): DashboardPayload {
-  return { ...(structuredClone(demoData) as DashboardPayload), generatedAt: new Date().toISOString() };
+  const demo = structuredClone(demoData) as Omit<DashboardPayload, "demographics">;
+  return { ...demo, demographics: emptyDemographics(), generatedAt: new Date().toISOString() };
 }
 
 async function fetchApi(population: Population = "students"): Promise<DashboardPayload> {
@@ -301,7 +310,7 @@ function logout(): void {
 }
 
 function validatePayload(payload: DashboardPayload): void {
-  if (!payload?.summary || !Array.isArray(payload.schools) || !Array.isArray(payload.mapPoints) || !Array.isArray(payload.monitoringRows)) {
+  if (!payload?.summary || !payload.demographics || !Array.isArray(payload.demographics.genders) || !Array.isArray(payload.schools) || !Array.isArray(payload.mapPoints) || !Array.isArray(payload.monitoringRows)) {
     throw new Error("El endpoint devolvió un formato inesperado");
   }
   if (payload.summary.complete + payload.summary.incomplete !== payload.summary.total) {
@@ -323,16 +332,46 @@ function emptyPayload(): DashboardPayload {
     generatedAt: studentData?.generatedAt ?? new Date().toISOString(),
     surveyId: "",
     summary: { total: 0, complete: 0, incomplete: 0, completePct: 0 },
+    demographics: emptyDemographics(),
     schools: [],
     mapPoints: [],
     monitoringRows: [],
   };
 }
 
+function emptyDemographics(): DashboardPayload["demographics"] {
+  return {
+    validAges: 0,
+    ageGroups: { "Hasta 15": 0, "16–18": 0, "19–29": 0, "30–39": 0, "40–49": 0, "50–59": 0, "60 o más": 0 },
+    validGenders: 0,
+    genders: [],
+  };
+}
+
+function selectPanorama(): void {
+  if (activeSection === "panorama") return;
+  activeSection = "panorama";
+  document.body.dataset.section = "panorama";
+  document.querySelector("#panorama-button")?.classList.add("active");
+  document.querySelectorAll<HTMLButtonElement>("[data-population]").forEach((button) => {
+    button.classList.remove("active");
+    button.setAttribute("aria-pressed", "false");
+  });
+  document.querySelector("#population-tabs")?.classList.add("hidden");
+  document.querySelectorAll("#tracking-view, #map-view, #monitoring-view").forEach((view) => view.classList.add("hidden"));
+  document.querySelector("#panorama-view")?.classList.remove("hidden");
+  const brandLabel = document.querySelector<HTMLElement>("#brand-survey-label");
+  if (brandLabel) brandLabel.textContent = "ITED 2026 · PANORAMA GENERAL DE LA ENCUESTA";
+  closeSchoolModal();
+  render();
+}
+
 function selectPopulation(population: Population): void {
-  if (!POPULATION_LABELS[population] || activePopulation === population) return;
+  if (!POPULATION_LABELS[population] || (activeSection === "population" && activePopulation === population)) return;
+  activeSection = "population";
   activePopulation = population;
   document.body.dataset.population = population;
+  document.body.dataset.section = "population";
   data = payloadForPopulation(population);
   filtersInitialized = false;
   selectedSchoolIds.clear();
@@ -341,19 +380,35 @@ function selectPopulation(population: Population): void {
     button.classList.toggle("active", selected);
     button.setAttribute("aria-pressed", String(selected));
   });
+  document.querySelector("#panorama-button")?.classList.remove("active");
+  document.querySelector("#population-tabs")?.classList.remove("hidden");
+  document.querySelector("#panorama-view")?.classList.add("hidden");
   const brandLabel = document.querySelector<HTMLElement>("#brand-survey-label");
   if (brandLabel) brandLabel.textContent = `ITED 2026 · ENCUESTA A ${POPULATION_LABELS[population]}`;
   const pointsMode = document.querySelector<HTMLElement>("#points-mode");
   if (pointsMode) pointsMode.textContent = population === "students" ? "Matrícula" : "Respuestas";
   const mapTab = document.querySelector<HTMLButtonElement>('[data-tab="map"]');
   mapTab?.classList.toggle("hidden", population !== "students");
-  if (population !== "students" && !document.querySelector("#map-view")?.classList.contains("hidden")) switchTab("tracking");
+  if (population !== "students" && activeDashboardView === "map") activeDashboardView = "tracking";
+  switchTab(activeDashboardView);
   closeSchoolModal();
   render();
 }
 
 function render(): void {
   if (!data) return;
+  const studentsCount = document.querySelector<HTMLElement>("#students-count");
+  if (studentsCount) studentsCount.textContent = String(studentData?.summary.total ?? 0);
+  const teachersCount = document.querySelector<HTMLElement>("#teachers-count");
+  if (teachersCount) teachersCount.textContent = String(teacherData?.summary.total ?? 0);
+  const familiesCount = document.querySelector<HTMLElement>("#families-count");
+  if (familiesCount) familiesCount.textContent = String(familyData?.summary.total ?? 0);
+  if (activeSection === "panorama" && studentData && teacherData && familyData) {
+    const panorama = document.querySelector<HTMLElement>("#panorama-view");
+    if (panorama) renderPanoramaGeneral(panorama, { students: studentData, teachers: teacherData, families: familyData });
+    updateSyncLabel();
+    return;
+  }
   initializeFilters();
   const target = loadTarget();
   const progress = Math.min((data.summary.total / target) * 100, 100);
@@ -397,12 +452,6 @@ function render(): void {
   }));
   document.querySelector<HTMLElement>("#map-count")!.textContent = String(data.mapPoints.length);
   document.querySelector<HTMLElement>("#monitoring-count")!.textContent = String(data.monitoringRows.length);
-  const studentsCount = document.querySelector<HTMLElement>("#students-count");
-  if (studentsCount) studentsCount.textContent = String(studentData?.summary.total ?? 0);
-  const teachersCount = document.querySelector<HTMLElement>("#teachers-count");
-  if (teachersCount) teachersCount.textContent = String(teacherData?.summary.total ?? 0);
-  const familiesCount = document.querySelector<HTMLElement>("#families-count");
-  if (familiesCount) familiesCount.textContent = String(familyData?.summary.total ?? 0);
   renderMonitoring();
   renderLegend();
   renderMapStatus();
@@ -552,6 +601,7 @@ function monitoringSortValue(row: MonitoringRow, key: MonitoringSortKey): string
 
 function switchTab(tab: DashboardView): void {
   if (!(["tracking", "map", "monitoring"] as DashboardView[]).includes(tab)) tab = "tracking";
+  activeDashboardView = tab;
   document.querySelectorAll(".tab").forEach((element) => element.classList.toggle("active", (element as HTMLElement).dataset.tab === tab));
   document.querySelector("#tracking-view")?.classList.toggle("hidden", tab !== "tracking");
   document.querySelector("#map-view")?.classList.toggle("hidden", tab !== "map");
@@ -852,7 +902,7 @@ function updateSyncLabel(): void {
 }
 
 function renderWarning(): void {
-  let slot = document.querySelector<HTMLElement>("#warning-slot");
+  let slot = document.querySelector<HTMLElement>(activeSection === "panorama" ? "#panorama-warning-slot" : "#warning-slot");
   if (!slot) {
     const tracking = document.querySelector<HTMLElement>("#tracking-view");
     if (tracking) {

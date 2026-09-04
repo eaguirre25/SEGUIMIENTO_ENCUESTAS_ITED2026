@@ -17,6 +17,8 @@ export const QUESTION_MAP = {
   ROLE: null,
   ROLE_OTHER: null,
   IN_SAN_MARTIN: null,
+  AGE: ["Q993999", "977929X337X3228"],
+  GENDER: ["Q003", "977929X337X3183"],
 } as const satisfies Record<string, string | readonly string[] | null>;
 
 /**
@@ -34,6 +36,8 @@ export const DASHBOARD_EXPORT_FIELDS = [
   "977929X336X3238",
   "977929X337X3250SQ002",
   "977929X337X3250SQ003",
+  "977929X337X3228",
+  "977929X337X3183",
 ] as const;
 
 /**
@@ -55,6 +59,8 @@ export const TEACHER_QUESTION_MAP = {
   ROLE: ["ROL", "985318X456X5370"],
   ROLE_OTHER: ["ROLOTRO", "985318X456X5426"],
   IN_SAN_MARTIN: null,
+  AGE: ["EDAD", "985318X464X5397"],
+  GENDER: ["GENERO", "985318X464X5396"],
 } as const satisfies Record<string, string | readonly string[] | null>;
 
 // LimeSurvey exige nombres internos en aFields. Pedirlos explícitamente evita
@@ -66,12 +72,15 @@ export const TEACHER_DASHBOARD_EXPORT_FIELDS = [
   "985318X456X5370",
   "985318X456X5426",
   "985318X456X5372",
+  "985318X464X5397",
+  "985318X464X5396",
 ] as const;
 
 /**
  * Encuesta de familias y responsables (997168). Se exportan únicamente los
- * campos necesarios para seguimiento de carga; quedan fuera las respuestas
- * abiertas, los datos del hogar, la edad, el género y la ubicación declarada.
+ * campos necesarios para seguimiento de carga y los dos campos demográficos
+ * que se agregan en el Worker. Quedan fuera las respuestas abiertas, los datos
+ * del hogar y la ubicación declarada.
  */
 export const FAMILY_QUESTION_MAP = {
   SCHOOL: ["ESCUELA", "997168X472X5756", "ESCUELAFUERA", "997168X472X5802"],
@@ -87,6 +96,8 @@ export const FAMILY_QUESTION_MAP = {
   ROLE: ["VINCULO", "997168X472X5754"],
   ROLE_OTHER: ["Q284042", "997168X472X5947"],
   IN_SAN_MARTIN: ["SANMARTIN", "997168X472X5755"],
+  AGE: ["EDAD", "997168X472X5779"],
+  GENDER: ["GENERO", "997168X472X5778"],
 } as const satisfies Record<string, string | readonly string[] | null>;
 
 export const FAMILY_DASHBOARD_EXPORT_FIELDS = [
@@ -99,4 +110,6 @@ export const FAMILY_DASHBOARD_EXPORT_FIELDS = [
   "997168X472X5756",
   "997168X472X5802",
   "997168X472X5757",
+  "997168X472X5779",
+  "997168X472X5778",
 ] as const;

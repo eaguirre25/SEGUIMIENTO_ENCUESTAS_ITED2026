@@ -1,7 +1,9 @@
 import { QUESTION_MAP } from "./question-map";
 import type {
+  AgeGroup,
   Counts,
   DashboardPayload,
+  DemographicSummary,
   LoadMonitoringRow,
   ManagementType,
   NormalizedResponse,
@@ -10,7 +12,7 @@ import type {
   SchoolSummary,
 } from "./types";
 
-type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL" | "ROLE" | "ROLE_OTHER" | "IN_SAN_MARTIN";
+type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL" | "ROLE" | "ROLE_OTHER" | "IN_SAN_MARTIN" | "AGE" | "GENDER";
 export type QuestionMap = Omit<Record<keyof typeof QUESTION_MAP, string | readonly string[] | null>, OptionalSchoolBranch>
   & Partial<Record<OptionalSchoolBranch, string | readonly string[] | null>>;
 
@@ -24,6 +26,10 @@ const EXCLUDED_TEST_RESPONSE_KEYS = new Set([
 const STATE_SCHOOL_NUMBER_ALIASES: Readonly<Record<string, number>> = {
   "alfonsina storni": 6,
 };
+
+export const AGE_GROUPS: readonly AgeGroup[] = [
+  "Hasta 15", "16–18", "19–29", "30–39", "40–49", "50–59", "60 o más",
+];
 
 export function normalizeSchool(value: unknown): { original: string; key: string } | null {
   if (typeof value !== "string" && typeof value !== "number") return null;
@@ -97,6 +103,27 @@ export function parseYesNo(value: unknown): boolean | null {
   return null;
 }
 
+export function parseAgeGroup(value: unknown): AgeGroup | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const text = String(value).trim();
+  if (!/^\d{1,3}(?:[.,]0+)?$/.test(text)) return null;
+  const age = Number(text.replace(",", "."));
+  if (!Number.isInteger(age) || age < 5 || age > 120) return null;
+  if (age <= 15) return "Hasta 15";
+  if (age <= 18) return "16–18";
+  if (age <= 29) return "19–29";
+  if (age <= 39) return "30–39";
+  if (age <= 49) return "40–49";
+  if (age <= 59) return "50–59";
+  return "60 o más";
+}
+
+export function normalizeGender(value: unknown): string | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const label = String(value).trim().replace(/\s*\[[^\]]+\]\s*$/, "").replace(/\s+/g, " ");
+  return label || null;
+}
+
 export function parseCoordinate(value: unknown, kind: "lat" | "lon"): number | null {
   if (typeof value !== "number" && typeof value !== "string") return null;
   const parsed = Number(String(value).trim().replace(",", "."));
@@ -120,6 +147,8 @@ export function normalizeResponse(raw: RawResponse, map: QuestionMap): Normalize
     complete: detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
     lat,
     lon,
+    ageGroup: map.AGE ? parseAgeGroup(readMappedValue(raw, map.AGE)) : null,
+    gender: map.GENDER ? normalizeGender(readMappedValue(raw, map.GENDER)) : null,
   };
 }
 
@@ -231,6 +260,37 @@ function createRole(): RoleCounts {
   return { ...emptyCounts(), years };
 }
 
+function emptyDemographics(): DemographicSummary {
+  return {
+    validAges: 0,
+    ageGroups: Object.fromEntries(AGE_GROUPS.map((group) => [group, 0])) as Record<AgeGroup, number>,
+    validGenders: 0,
+    genders: [],
+  };
+}
+
+function addDemographic(demographics: DemographicSummary, ageGroup: AgeGroup | null, gender: string | null): void {
+  if (ageGroup) {
+    demographics.validAges += 1;
+    demographics.ageGroups[ageGroup] += 1;
+  }
+  if (gender) {
+    demographics.validGenders += 1;
+    const key = gender.normalize("NFKC").toLocaleLowerCase("es-AR");
+    const existing = demographics.genders.find((item) => item.label.normalize("NFKC").toLocaleLowerCase("es-AR") === key);
+    if (existing) existing.count += 1;
+    else demographics.genders.push({ label: gender, count: 1 });
+  }
+}
+
+function finishDemographics(demographics: DemographicSummary): DemographicSummary {
+  return {
+    ...demographics,
+    ageGroups: { ...demographics.ageGroups },
+    genders: [...demographics.genders].sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, "es")),
+  };
+}
+
 export function buildDashboard(
   rawResponses: RawResponse[],
   surveyId: string,
@@ -243,10 +303,18 @@ export function buildDashboard(
     return item ? [item] : [];
   });
   const summary = emptyCounts();
+  const demographics = emptyDemographics();
   const schools = new Map<string, SchoolSummary>();
 
   const completionField = firstField(map.COMPLETION) ?? "submitdate";
-  for (const raw of includedResponses) add(summary, detectCompletion(raw, completionField));
+  for (const raw of includedResponses) {
+    add(summary, detectCompletion(raw, completionField));
+    addDemographic(
+      demographics,
+      map.AGE ? parseAgeGroup(readMappedValue(raw, map.AGE)) : null,
+      map.GENDER ? normalizeGender(readMappedValue(raw, map.GENDER)) : null,
+    );
+  }
 
   for (const item of normalized) {
     let school = schools.get(item.schoolKey);
@@ -257,12 +325,14 @@ export function buildDashboard(
         managementType: item.managementType,
         ...emptyCounts(),
         roles: { student: createRole() },
+        demographics: emptyDemographics(),
       };
       schools.set(item.schoolKey, school);
     }
     add(school, item.complete);
     add(school.roles.student, item.complete);
     if (item.courseYear) add(school.roles.student.years[String(item.courseYear)], item.complete);
+    addDemographic(school.demographics, item.ageGroup, item.gender);
   }
 
   const schoolList = [...schools.values()]
@@ -282,6 +352,7 @@ export function buildDashboard(
           ),
         },
       },
+      demographics: finishDemographics(school.demographics),
     }))
     .sort((a, b) => b.total - a.total || a.school.localeCompare(b.school, "es"));
 
@@ -289,6 +360,7 @@ export function buildDashboard(
     generatedAt,
     surveyId,
     summary: finishCounts(summary),
+    demographics: finishDemographics(demographics),
     schools: schoolList,
     mapPoints: includedResponses.flatMap((raw) => {
       const lat = map.LATITUDE ? parseCoordinate(readMappedValue(raw, map.LATITUDE), "lat") : null;
