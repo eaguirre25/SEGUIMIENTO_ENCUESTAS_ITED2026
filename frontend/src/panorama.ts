@@ -105,6 +105,7 @@ function combineSchools(payloads: PopulationData): CombinedSchool[] {
 }
 
 function schoolId(school: SchoolSummary): string {
+  if (fold(school.school) === "eps 47 408") return "institution:eps-47-408";
   if (school.schoolNumber !== null) return `state:${school.schoolNumber}`;
   return `${school.managementType}:${fold(school.school)}`;
 }
@@ -168,14 +169,15 @@ function panel(title: string, subtitle: string, content: string, extraClass = ""
 function schoolBars(schools: CombinedSchool[]): string {
   if (!schools.length) return emptyChart("No hay escuelas identificadas para esta selección.");
   const maximum = Math.max(...schools.map((school) => school.total), 1);
+  const grandTotal = schools.reduce((sum, school) => sum + school.total, 0);
   return `<div class="stacked-chart">${schools.map((school) => `
     <div class="stacked-row">
       <span title="${escapeHtml(school.label)}">${escapeHtml(school.label)}</span>
-      <div class="stacked-track" style="--bar-width:${school.total / maximum * 100}%" title="${escapeHtml(school.label)} · Total ${school.total} · Estudiantes ${school.counts.students} · Docentes ${school.counts.teachers} · Familias ${school.counts.families}">
+      <div class="stacked-track" style="--bar-width:${school.total / maximum * 100}%" title="${escapeHtml(school.label)} · Total N=${school.total} (${formatPct(grandTotal ? school.total / grandTotal * 100 : 0)}) · Estudiantes N=${school.counts.students} (${formatPct(school.total ? school.counts.students / school.total * 100 : 0)}) · Docentes N=${school.counts.teachers} (${formatPct(school.total ? school.counts.teachers / school.total * 100 : 0)}) · Familias N=${school.counts.families} (${formatPct(school.total ? school.counts.families / school.total * 100 : 0)})">
         <i class="students" style="width:${school.total ? school.counts.students / school.total * 100 : 0}%"></i>
         <i class="teachers" style="width:${school.total ? school.counts.teachers / school.total * 100 : 0}%"></i>
         <i class="families" style="width:${school.total ? school.counts.families / school.total * 100 : 0}%"></i>
-      </div><b>${formatNumber(school.total)}</b>
+      </div><b>N=${formatNumber(school.total)}<small>${formatPct(grandTotal ? school.total / grandTotal * 100 : 0)}</small></b>
     </div>`).join("")}</div>${populationLegend()}`;
 }
 
@@ -183,7 +185,7 @@ function populationBars(totals: Record<Population, number>): string {
   const total = POPULATIONS.reduce((sum, population) => sum + totals[population], 0);
   return `<div class="population-chart">${POPULATIONS.map((population) => {
     const pct = total ? totals[population] / total * 100 : 0;
-    return `<div class="population-row"><span>${LABELS[population]}</span><div><i style="width:${pct}%;background:${COLORS[population]}"></i></div><strong>${formatNumber(totals[population])}<small>${formatPct(pct)}</small></strong></div>`;
+    return `<div class="population-row"><span>${LABELS[population]}</span><div><i style="width:${pct}%;background:${COLORS[population]}"></i></div><strong>N=${formatNumber(totals[population])}<small>${formatPct(pct)}</small></strong></div>`;
   }).join("")}</div>`;
 }
 
@@ -192,7 +194,7 @@ function simpleBars(items: Array<{ label: string; count: number }>, denominator:
   if (!items.length) return emptyChart("Todavía no hay datos válidos.");
   return `<div class="simple-chart">${items.map((item) => {
     const pct = denominator ? item.count / denominator * 100 : 0;
-    return `<div class="simple-row" title="${escapeHtml(item.label)} · ${item.count} · ${formatPct(pct)}"><span>${escapeHtml(item.label)}</span><div><i style="width:${item.count / maximum * 100}%;background:${color}"></i></div><b>${formatNumber(item.count)}<small>${formatPct(pct)}</small></b></div>`;
+    return `<div class="simple-row" title="${escapeHtml(item.label)} · N=${item.count} · ${formatPct(pct)}"><span>${escapeHtml(item.label)}</span><div><i style="width:${item.count / maximum * 100}%;background:${color}"></i></div><b>N=${formatNumber(item.count)}<small>${formatPct(pct)}</small></b></div>`;
   }).join("")}</div>`;
 }
 
@@ -207,7 +209,8 @@ function coverageMatrix(schools: CombinedSchool[]): string {
   return `<div class="coverage-wrap"><table class="coverage-table"><thead><tr><th>Escuela</th>${POPULATIONS.map((population) => `<th>${LABELS[population]}</th>`).join("")}</tr></thead><tbody>${schools.map((school) => `<tr><th>${escapeHtml(school.label)}</th>${POPULATIONS.map((population) => {
     const count = school.counts[population];
     const intensity = .08 + count / maximum * .72;
-    return `<td title="${escapeHtml(school.label)} · ${LABELS[population]}: ${count}" style="--heat:${intensity}">${formatNumber(count)}</td>`;
+    const pct = school.total ? count / school.total * 100 : 0;
+    return `<td title="${escapeHtml(school.label)} · ${LABELS[population]}: N=${count} · ${formatPct(pct)}" style="--heat:${intensity}"><b>N=${formatNumber(count)}</b><small>${formatPct(pct)}</small></td>`;
   }).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
 
@@ -246,7 +249,7 @@ function timelineMarkup(payloads: PopulationData, school: CombinedSchool | null)
     { label: "Total", color: "#f4f6fa", values: totalSeries },
     ...POPULATIONS.map((population) => ({ label: LABELS[population], color: COLORS[population], values: cumulative[population] })),
   ];
-  const chart = `<div class="timeline-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Evolución acumulada de respuestas">${[0, .25, .5, .75, 1].map((ratio) => `<line x1="0" x2="${width}" y1="${height - ratio * (height - 20)}" y2="${height - ratio * (height - 20)}"/>`).join("")}${series.map((item) => `<polyline points="${item.values.map(point).join(" ")}" style="stroke:${item.color}"/>${item.values.map((value, index) => `<circle cx="${point(value, index).split(",")[0]}" cy="${point(value, index).split(",")[1]}" r="3" style="fill:${item.color}"><title>${item.label} · ${formatDate(dates[index])}: ${value}</title></circle>`).join("")}`).join("")}</svg><div class="timeline-axis"><span>${formatDate(dates[0])}</span><span>${formatDate(dates.at(-1) ?? dates[0])}</span></div></div><div class="timeline-legend"><span class="total">Total</span>${populationLegend()}</div>`;
+  const chart = `<div class="timeline-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Evolución acumulada de respuestas">${[0, .25, .5, .75, 1].map((ratio) => `<line x1="0" x2="${width}" y1="${height - ratio * (height - 20)}" y2="${height - ratio * (height - 20)}"/>`).join("")}${series.map((item) => `<polyline points="${item.values.map(point).join(" ")}" style="stroke:${item.color}"/>${item.values.map((value, index) => `<circle cx="${point(value, index).split(",")[0]}" cy="${point(value, index).split(",")[1]}" r="3" style="fill:${item.color}"><title>${item.label} · ${formatDate(dates[index])}: N=${value} · ${formatPct(totalSeries[index] ? value / totalSeries[index] * 100 : 0)}</title></circle>`).join("")}`).join("")}</svg><div class="timeline-axis"><span>${formatDate(dates[0])}</span><span>${formatDate(dates.at(-1) ?? dates[0])}</span></div></div><div class="timeline-legend"><span class="total">Total · N=${formatNumber(totalSeries.at(-1) ?? 0)} · 100,0 %</span>${POPULATIONS.map((population) => `<span style="--legend:${COLORS[population]}">${LABELS[population]} · N=${formatNumber(cumulative[population].at(-1) ?? 0)} · ${formatPct((totalSeries.at(-1) ?? 0) ? (cumulative[population].at(-1) ?? 0) / (totalSeries.at(-1) ?? 1) * 100 : 0)}</span>`).join("")}</div>`;
   return panel("Evolución temporal del relevamiento", "Cantidad acumulada de respuestas con fecha válida", chart, "panorama-full");
 }
 
@@ -255,6 +258,7 @@ function filteredDates(payload: DashboardPayload, school: SchoolSummary | null):
 }
 
 function rowMatchesSchool(label: string, managementType: ManagementType, school: SchoolSummary): boolean {
+  if (fold(school.school) === "eps 47 408") return fold(label) === "eps 47 408" || /^eps ?(?:47 )?408$/.test(fold(label));
   if (school.schoolNumber !== null) return managementType === "state" && singleSchoolNumber(label) === school.schoolNumber;
   return managementType === school.managementType && fold(label) === fold(school.school);
 }

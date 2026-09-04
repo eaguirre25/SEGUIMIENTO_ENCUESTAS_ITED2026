@@ -76,12 +76,25 @@ describe("normalización", () => {
   });
 
   it("consolida variantes inequívocas de escuelas numeradas", () => {
-    for (const variant of [4, "4", "EES4", "Media 4", "N°4", "Secundaria 4 Ricardo Rojas", "Escuela Número 4 Ricardo Rojas"]) {
+    for (const variant of [4, "4", "EES4", "EESN 4", "EESN4", "Media 4", "N°4", "Secundaria 4 Ricardo Rojas", "Escuela Número 4 Ricardo Rojas"]) {
       expect(normalizeSchool(variant)?.original).toBe("EES 4");
     }
     expect(normalizeSchool("ees26")?.original).toBe("EES 26");
     expect(normalizeSchool("Ee27")?.original).toBe("EES 27");
     expect(normalizeSchool("Santa Ana")?.original).toBe("Santa Ana");
+  });
+
+  it("consolida las variantes de la EPS 47/408", () => {
+    for (const variant of ["EPS 408", "EpS47/408", "EPS 47/408"]) {
+      expect(normalizeSchool(variant)).toEqual({ original: "EPS 47/408", key: "eps 47/408" });
+    }
+    const result = buildDashboard([
+      { school: "EPS 408", submitdate: "2026-09-04" },
+      { school: "EpS47/408", submitdate: null },
+      { school: "EPS 47/408", submitdate: "2026-09-04" },
+    ], "test", map);
+    expect(result.schools).toHaveLength(1);
+    expect(result.schools[0]).toMatchObject({ school: "EPS 47/408", total: 3, complete: 2, incomplete: 1 });
   });
 
   it("recupera el único número escolar válido del texto estatal", () => {
