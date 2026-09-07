@@ -83,7 +83,8 @@ function combineSchools(payloads: PopulationData): CombinedSchool[] {
   for (const population of POPULATIONS) {
     for (const school of payloads[population].schools) {
       const id = schoolId(school);
-      const isEps47 = id === "state:47" || id === "institution:eps-47-408" || school.schoolNumber === 47 || fold(school.school) === "eps 408 es47";
+      const f = fold(school.school);
+      const isEps47 = id === "state:47" || id === "institution:eps-47-408" || school.schoolNumber === 47 || f.includes("408") || f === "eps 408 es47";
       const canonicalLabel = isEps47 ? "EPS 408 (ES47)" : school.school;
       const current = combined.get(id) ?? {
         id,
@@ -110,7 +111,7 @@ function combineSchools(payloads: PopulationData): CombinedSchool[] {
 
 function schoolId(school: SchoolSummary): string {
   const f = fold(school.school);
-  if (school.schoolNumber === 47 || f === "eps 408 es47" || f === "eps 47 408" || f === "ees 47 408" || f === "ees47 408" || f === "ees 47") return "state:47";
+  if (school.schoolNumber === 47 || f.includes("408") || f === "eps 408 es47" || f === "eps 47 408" || f === "ees 47 408" || f === "ees47 408" || f === "ees 47") return "state:47";
   if (school.schoolNumber !== null) return `state:${school.schoolNumber}`;
   return `${school.managementType}:${fold(school.school)}`;
 }

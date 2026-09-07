@@ -194,6 +194,10 @@ function normalizeExternalSchool(value: unknown): { original: string; key: strin
   if (typeof value !== "string" && typeof value !== "number") return null;
   const original = String(value).trim().replace(/\s+/g, " ");
   if (!original) return null;
+  const canonical = canonicalSchoolLabel(original);
+  if (canonical === "EPS 408 (ES47)") {
+    return { original: "EPS 408 (ES47)", key: "eps 408 (es47)" };
+  }
   return {
     original,
     key: `external:${original.normalize("NFKC").toLocaleLowerCase("es-AR")}`,

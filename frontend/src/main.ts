@@ -747,11 +747,14 @@ function initializeFilters(): void {
 }
 
 function schoolDisplayName(school: SchoolSummary): string {
-  if (school.schoolNumber === 47 || privateSchoolKey(school.school) === "eps 408 es47") return "EPS 408 (ES47)";
+  if (school.schoolNumber === 47 || school.school.includes("408") || privateSchoolKey(school.school) === "eps 408 es47") return "EPS 408 (ES47)";
   return schoolLocationForSummary(school)?.name ?? school.school;
 }
 
 function schoolLocationForSummary(school: SchoolSummary): SchoolLocation | null {
+  if (school.schoolNumber === 47 || school.school.includes("408")) {
+    return STATE_SCHOOLS.find((candidate) => candidate.schoolNumber === 47) ?? null;
+  }
   if (school.managementType === "state" && school.schoolNumber !== null) {
     return STATE_SCHOOLS.find((candidate) => candidate.schoolNumber === school.schoolNumber) ?? null;
   }
