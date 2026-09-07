@@ -183,6 +183,10 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
     school = normalizeSchool(mappedSchoolValue);
   }
   if (!school) return null;
+  if (school.original === "EPS 408 (ES47)") {
+    schoolNumber = 47;
+    managementType = "state";
+  }
   return { school, schoolNumber, managementType };
 }
 

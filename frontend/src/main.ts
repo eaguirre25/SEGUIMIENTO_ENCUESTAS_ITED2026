@@ -747,6 +747,7 @@ function initializeFilters(): void {
 }
 
 function schoolDisplayName(school: SchoolSummary): string {
+  if (school.schoolNumber === 47 || privateSchoolKey(school.school) === "eps 408 es47") return "EPS 408 (ES47)";
   return schoolLocationForSummary(school)?.name ?? school.school;
 }
 
