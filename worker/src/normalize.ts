@@ -45,7 +45,14 @@ export function normalizeSchool(value: unknown): { original: string; key: string
 function canonicalSchoolLabel(value: string): string {
   if (!value) return value;
   const folded = foldSchoolText(value);
-  if (/^eps ?(?:47 )?408$/.test(folded)) return "EPS 47/408";
+  if (
+    /408/.test(folded) ||
+    /^eps(?: |$)/.test(folded) ||
+    /^(?:ees|es|media)? ?47(?: |$)/.test(folded) ||
+    /^escuela (?:profesional|secundaria|profesional secundaria|secundaria profesional)/.test(folded)
+  ) {
+    return "EPS 408 (ES47)";
+  }
   const schoolNumber = parseSchoolNumber(folded);
   if (schoolNumber === null) return value;
   const number = String(schoolNumber);

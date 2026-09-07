@@ -105,7 +105,8 @@ function combineSchools(payloads: PopulationData): CombinedSchool[] {
 }
 
 function schoolId(school: SchoolSummary): string {
-  if (fold(school.school) === "eps 47 408") return "institution:eps-47-408";
+  const f = fold(school.school);
+  if (f === "eps 408 es47" || f === "eps 47 408" || f === "ees 47 408" || f === "ees47 408" || f === "ees 47") return "institution:eps-47-408";
   if (school.schoolNumber !== null) return `state:${school.schoolNumber}`;
   return `${school.managementType}:${fold(school.school)}`;
 }
@@ -258,7 +259,11 @@ function filteredDates(payload: DashboardPayload, school: SchoolSummary | null):
 }
 
 function rowMatchesSchool(label: string, managementType: ManagementType, school: SchoolSummary): boolean {
-  if (fold(school.school) === "eps 47 408") return fold(label) === "eps 47 408" || /^eps ?(?:47 )?408$/.test(fold(label));
+  const sf = fold(school.school);
+  if (sf === "eps 408 es47" || sf === "eps 47 408" || sf === "ees 47 408" || sf === "ees47 408" || sf === "ees 47") {
+    const lf = fold(label);
+    return /408/.test(lf) || /^eps(?: |$)/.test(lf) || /^(?:ees|es|media)? ?47(?: |$)/.test(lf) || /^escuela (?:profesional|secundaria)/.test(lf);
+  }
   if (school.schoolNumber !== null) return managementType === "state" && singleSchoolNumber(label) === school.schoolNumber;
   return managementType === school.managementType && fold(label) === fold(school.school);
 }

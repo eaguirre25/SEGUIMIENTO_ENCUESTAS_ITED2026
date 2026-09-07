@@ -84,17 +84,18 @@ describe("normalización", () => {
     expect(normalizeSchool("Santa Ana")?.original).toBe("Santa Ana");
   });
 
-  it("consolida las variantes de la EPS 47/408", () => {
-    for (const variant of ["EPS 408", "EpS47/408", "EPS 47/408"]) {
-      expect(normalizeSchool(variant)).toEqual({ original: "EPS 47/408", key: "eps 47/408" });
+  it("consolida las variantes de la EPS 408 (ES47) (incluyendo EES 47, EES47, EPS, Escuela Secundaria Profesional, etc.)", () => {
+    for (const variant of ["EES 47", "EES47", "EPS 408", "EpS47/408", "EPS 47/408", "EES 47/408", "EES47/408", "EPS", "Eps", "Escuela Profesional Secundaria"]) {
+      expect(normalizeSchool(variant)).toEqual({ original: "EPS 408 (ES47)", key: "eps 408 (es47)" });
     }
     const result = buildDashboard([
+      { school: "EES 47", submitdate: "2026-09-04" },
       { school: "EPS 408", submitdate: "2026-09-04" },
       { school: "EpS47/408", submitdate: null },
-      { school: "EPS 47/408", submitdate: "2026-09-04" },
+      { school: "Escuela Profesional Secundaria...", submitdate: "2026-09-04" },
     ], "test", map);
     expect(result.schools).toHaveLength(1);
-    expect(result.schools[0]).toMatchObject({ school: "EPS 47/408", total: 3, complete: 2, incomplete: 1 });
+    expect(result.schools[0]).toMatchObject({ school: "EPS 408 (ES47)", total: 4, complete: 3, incomplete: 1 });
   });
 
   it("recupera el único número escolar válido del texto estatal", () => {
