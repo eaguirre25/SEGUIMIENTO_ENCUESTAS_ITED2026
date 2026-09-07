@@ -296,3 +296,12 @@ body, button, input, .brand p, .eyebrow, .sync, .tab-count, .live-badge,
   .school-name { font-size: 14px; } .school-summary > strong, .school-summary > span:not(.school-name) { font-size: 13px; }
   .modal-years { grid-template-columns: 1fr; }
 }
+
+/* Mobile PWA & Touch Optimizations */
+@media (max-width: 760px) {
+  body { padding-bottom: max(20px, env(safe-area-inset-bottom, 20px)); }
+  .topbar { padding-top: max(14px, env(safe-area-inset-top, 14px)); }
+  .population-button, .tab, button, input, select { min-height: 44px; touch-action: manipulation; }
+  main { padding-bottom: max(60px, env(safe-area-inset-bottom, 60px)); }
+}
+

@@ -1,0 +1,17 @@
+{
+  "short_name": "ITED 2026",
+  "name": "ITED 2026 · Seguimiento de Encuestas",
+  "description": "Panel de seguimiento en tiempo real del operativo de encuestas ITED 2026.",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#090b10",
+  "theme_color": "#090b10",
+  "display": "standalone",
+  "orientation": "portrait"
+}
