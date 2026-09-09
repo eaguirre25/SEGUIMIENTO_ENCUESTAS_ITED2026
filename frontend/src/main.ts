@@ -384,10 +384,10 @@ function canonicalSchoolIdentity(school: string, schoolNumber: number | null, ma
     || ["e e s", "a estudiar", "hh"].includes(folded)
     || /^(?:ees|es|media|escuelasecundaria)(?:n|no|numero)?0*6(?:\D|$)/.test(compact);
   if (ees6) return { school: "EES 6", schoolNumber: 6, managementType: "state" };
-  const esn4 = schoolNumber === 4
+  const ees4 = schoolNumber === 4
     || /\bricardo rojas\b/.test(folded)
     || /^(?:ees|es|esn|media|secundaria|escuelasecundaria|escueladeeducacionsecundaria)(?:n|no|numero)?0*4(?:\D|$)/.test(compact);
-  if (esn4) return { school: "ESN4", schoolNumber: 4, managementType: "state" };
+  if (ees4) return { school: "EES 4", schoolNumber: 4, managementType: "state" };
   if (schoolNumber === 47 || /408/.test(folded) || /^(?:ees|es|eps)? ?47(?: |$)/.test(folded)) {
     return { school: "EPS 408 (ES47)", schoolNumber: 47, managementType: "state" };
   }

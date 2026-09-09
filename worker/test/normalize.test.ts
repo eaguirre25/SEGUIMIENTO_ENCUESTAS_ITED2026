@@ -77,7 +77,7 @@ describe("normalización", () => {
 
   it("consolida variantes inequívocas de escuelas numeradas", () => {
     for (const variant of [4, "4", "EES4", "EESN 4", "EESN4", "Media 4", "N°4", "Secundaria 4 Ricardo Rojas", "Escuela Número 4 Ricardo Rojas"]) {
-      expect(normalizeSchool(variant)?.original).toBe("ESN4");
+      expect(normalizeSchool(variant)?.original).toBe("EES 4");
     }
     expect(normalizeSchool("ees26")?.original).toBe("EES 26");
     expect(normalizeSchool("Ee27")?.original).toBe("EES 27");
@@ -127,7 +127,7 @@ describe("normalización", () => {
       validGenders: 3,
       genders: [{ label: "Mujer", count: 2 }, { label: "Varón", count: 1 }],
     });
-    expect(result.schools.find((school) => school.school === "ESN4")?.demographics.validAges).toBe(2);
+    expect(result.schools.find((school) => school.school === "EES 4")?.demographics.validAges).toBe(2);
     expect(result.monitoringRows[0]).not.toHaveProperty("age");
     expect(result.monitoringRows[0]).not.toHaveProperty("gender");
   });
@@ -146,7 +146,7 @@ describe("normalización", () => {
       { management: "Privada", private_school: "Santa Ana", submitdate: "2026-08-13" },
     ], "977929", surveyMap);
     expect(result.schools).toMatchObject([
-      { school: "ESN4", schoolNumber: 4, total: 2 },
+      { school: "EES 4", schoolNumber: 4, total: 2 },
       { school: "Santa Ana", schoolNumber: null, total: 1 },
     ]);
   });
@@ -192,9 +192,9 @@ describe("normalización", () => {
     }
   });
 
-  it("unifica las variantes de la Secundaria 4 bajo ESN4", () => {
+  it("unifica las variantes de la Secundaria 4 bajo EES 4", () => {
     for (const variant of ["EES 4", "EES4", "E.E.S.4", "E.E.S. N.º 4", "Secundaria 4", "Escuela de Educación Secundaria N°4 Dr. Ricardo Rojas", "Ricardo Rojas"]) {
-      expect(normalizeSchool(variant)?.original).toBe("ESN4");
+      expect(normalizeSchool(variant)?.original).toBe("EES 4");
     }
   });
 

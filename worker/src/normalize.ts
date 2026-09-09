@@ -57,7 +57,7 @@ function canonicalSchoolLabel(value: string): string {
   if (!value) return value;
   const folded = foldSchoolText(value);
   if (isEes6Alias(folded)) return "EES 6";
-  if (isEsn4Alias(folded)) return "ESN4";
+  if (isEes4Alias(folded)) return "EES 4";
   if (
     /408/.test(folded) ||
     /^eps(?: |$)/.test(folded) ||
@@ -71,7 +71,7 @@ function canonicalSchoolLabel(value: string): string {
   const number = String(schoolNumber);
   const onlyNumber = folded === String(Number(folded));
   const schoolMarker = new RegExp(`(?:^| )(?:eesn|ees|ee|es|n|numero|escuela|secundaria|media|md) *0*${number}(?: |$)`).test(folded);
-  if (schoolNumber === 4 && (onlyNumber || schoolMarker)) return "ESN4";
+  if (schoolNumber === 4 && (onlyNumber || schoolMarker)) return "EES 4";
   return onlyNumber || schoolMarker ? `EES ${number}` : value;
 }
 
@@ -99,7 +99,7 @@ function isEes6Alias(folded: string): boolean {
   return /^(?:ees|es|media|escuelasecundaria)(?:n|no|numero)?0*6(?:\D|$)/.test(compact);
 }
 
-function isEsn4Alias(folded: string): boolean {
+function isEes4Alias(folded: string): boolean {
   if (/\bricardo rojas\b/.test(folded)) return true;
   const compact = folded.replace(/\s+/g, "");
   return /^(?:ees|es|esn|media|secundaria|escuelasecundaria|escueladeeducacionsecundaria)(?:n|no|numero)?0*4(?:\D|$)/.test(compact);
