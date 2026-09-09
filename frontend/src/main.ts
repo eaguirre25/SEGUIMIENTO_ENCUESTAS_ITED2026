@@ -31,9 +31,7 @@ let maplibreModule: typeof import("maplibre-gl") | null = null;
 let map: MapLibreMap | null = null;
 let mapLoaded = false;
 let schoolMarkers: MapLibreMarker[] = [];
-let authHeader = sessionStorage.getItem("dashboard-session-token")
-  ? `Bearer ${sessionStorage.getItem("dashboard-session-token")}`
-  : "";
+let authHeader = sessionStorage.getItem("dashboard-authorization") ?? "";
 let mapMode: "points" | "heatmap" = "points";
 let showThreads = true;
 let filtersInitialized = false;
@@ -213,7 +211,7 @@ async function refresh(): Promise<void> {
   } catch (error) {
     if (error instanceof AuthenticationError) {
       authHeader = "";
-      sessionStorage.removeItem("dashboard-session-token");
+      sessionStorage.removeItem("dashboard-authorization");
       showLogin("Usuario o contraseña incorrectos.");
       return;
     }
@@ -242,17 +240,10 @@ async function handleLogin(event: SubmitEvent): Promise<void> {
   const username = document.querySelector<HTMLInputElement>("#login-username")?.value ?? "";
   const password = document.querySelector<HTMLInputElement>("#login-password")?.value ?? "";
   const remember = document.querySelector<HTMLInputElement>("#login-remember")?.checked ?? false;
-  const basicHeader = `Basic ${encodeCredentials(username, password)}`;
+  authHeader = `Basic ${encodeCredentials(username, password)}`;
   const submit = document.querySelector<HTMLButtonElement>("#login-form button[type='submit']");
   if (submit) { submit.disabled = true; submit.textContent = "Verificando…"; }
   try {
-    const sessionResponse = await fetch(`${API_BASE}/api/session`, { method: "POST", headers: { Authorization: basicHeader, Accept: "application/json" } });
-    if (sessionResponse.status === 401) throw new AuthenticationError("Credenciales inválidas");
-    if (!sessionResponse.ok) throw new Error(`No se pudo iniciar la sesión (HTTP ${sessionResponse.status})`);
-    const session = await sessionResponse.json() as { token?: unknown };
-    if (typeof session.token !== "string" || !session.token) throw new Error("El servidor no devolvió una sesión válida");
-    authHeader = `Bearer ${session.token}`;
-    sessionStorage.setItem("dashboard-session-token", session.token);
     const [students, teachers, families] = await Promise.all([
       fetchApi("students"),
       fetchApi("teachers"),
@@ -267,6 +258,7 @@ async function handleLogin(event: SubmitEvent): Promise<void> {
     data = payloadForPopulation(activePopulation);
     lastSuccessfulFetch = Date.now();
     warning = "";
+    sessionStorage.setItem("dashboard-authorization", authHeader);
     if (remember) {
       localStorage.setItem("dashboard-username", username);
     } else {
@@ -276,7 +268,7 @@ async function handleLogin(event: SubmitEvent): Promise<void> {
     render();
   } catch (error) {
     authHeader = "";
-    sessionStorage.removeItem("dashboard-session-token");
+    sessionStorage.removeItem("dashboard-authorization");
     showLogin(error instanceof AuthenticationError ? "Usuario o contraseña incorrectos." : "No se pudo validar el acceso.");
   } finally {
     if (submit) { submit.disabled = false; submit.textContent = "Ingresar"; }
@@ -310,7 +302,7 @@ function logout(): void {
   studentData = null;
   teacherData = null;
   familyData = null;
-  sessionStorage.removeItem("dashboard-session-token");
+  sessionStorage.removeItem("dashboard-authorization");
   showLogin();
 }
 
