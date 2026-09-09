@@ -1,4 +1,4 @@
-import maplibregl, { type GeoJSONSource } from "maplibre-gl";
+import type { GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, Marker as MapLibreMarker } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./style.css";
 import "./panorama.css";
@@ -27,10 +27,13 @@ let activeSection: "panorama" | "population" = "panorama";
 let activeDashboardView: DashboardView = "tracking";
 let lastSuccessfulFetch = 0;
 let warning = "";
-let map: maplibregl.Map | null = null;
+let maplibreModule: typeof import("maplibre-gl") | null = null;
+let map: MapLibreMap | null = null;
 let mapLoaded = false;
-let schoolMarkers: maplibregl.Marker[] = [];
-let authHeader = localStorage.getItem("dashboard-authorization") ?? sessionStorage.getItem("dashboard-authorization") ?? "";
+let schoolMarkers: MapLibreMarker[] = [];
+let authHeader = sessionStorage.getItem("dashboard-session-token")
+  ? `Bearer ${sessionStorage.getItem("dashboard-session-token")}`
+  : "";
 let mapMode: "points" | "heatmap" = "points";
 let showThreads = true;
 let filtersInitialized = false;
@@ -151,9 +154,9 @@ app.innerHTML = `
       <p class="eyebrow">ACCESO RESTRINGIDO</p>
       <h2>Seguimiento ITED 2026</h2>
       <p>Ingresá tus credenciales para visualizar respuestas y ubicaciones.</p>
-      <label>Usuario<input id="login-username" name="username" autocomplete="username" required></label>
+      <label>Usuario<input id="login-username" name="username" autocomplete="username" value="${escapeHtml(localStorage.getItem("dashboard-username") ?? "")}" required></label>
       <label>Contraseña<input id="login-password" name="password" type="password" autocomplete="current-password" required></label>
-      <label class="remember-option"><input id="login-remember" type="checkbox"><span>Recordarme en este dispositivo</span></label>
+      <label class="remember-option"><input id="login-remember" type="checkbox" ${localStorage.getItem("dashboard-username") ? "checked" : ""}><span>Recordar solamente mi usuario</span></label>
       <p id="login-error" class="login-error" role="alert"></p>
       <button type="submit">Ingresar</button>
     </form>
@@ -210,8 +213,7 @@ async function refresh(): Promise<void> {
   } catch (error) {
     if (error instanceof AuthenticationError) {
       authHeader = "";
-      sessionStorage.removeItem("dashboard-authorization");
-      localStorage.removeItem("dashboard-authorization");
+      sessionStorage.removeItem("dashboard-session-token");
       showLogin("Usuario o contraseña incorrectos.");
       return;
     }
@@ -240,10 +242,17 @@ async function handleLogin(event: SubmitEvent): Promise<void> {
   const username = document.querySelector<HTMLInputElement>("#login-username")?.value ?? "";
   const password = document.querySelector<HTMLInputElement>("#login-password")?.value ?? "";
   const remember = document.querySelector<HTMLInputElement>("#login-remember")?.checked ?? false;
-  authHeader = `Basic ${encodeCredentials(username, password)}`;
+  const basicHeader = `Basic ${encodeCredentials(username, password)}`;
   const submit = document.querySelector<HTMLButtonElement>("#login-form button[type='submit']");
   if (submit) { submit.disabled = true; submit.textContent = "Verificando…"; }
   try {
+    const sessionResponse = await fetch(`${API_BASE}/api/session`, { method: "POST", headers: { Authorization: basicHeader, Accept: "application/json" } });
+    if (sessionResponse.status === 401) throw new AuthenticationError("Credenciales inválidas");
+    if (!sessionResponse.ok) throw new Error(`No se pudo iniciar la sesión (HTTP ${sessionResponse.status})`);
+    const session = await sessionResponse.json() as { token?: unknown };
+    if (typeof session.token !== "string" || !session.token) throw new Error("El servidor no devolvió una sesión válida");
+    authHeader = `Bearer ${session.token}`;
+    sessionStorage.setItem("dashboard-session-token", session.token);
     const [students, teachers, families] = await Promise.all([
       fetchApi("students"),
       fetchApi("teachers"),
@@ -259,18 +268,15 @@ async function handleLogin(event: SubmitEvent): Promise<void> {
     lastSuccessfulFetch = Date.now();
     warning = "";
     if (remember) {
-      localStorage.setItem("dashboard-authorization", authHeader);
-      sessionStorage.removeItem("dashboard-authorization");
+      localStorage.setItem("dashboard-username", username);
     } else {
-      sessionStorage.setItem("dashboard-authorization", authHeader);
-      localStorage.removeItem("dashboard-authorization");
+      localStorage.removeItem("dashboard-username");
     }
     hideLogin();
     render();
   } catch (error) {
     authHeader = "";
-    sessionStorage.removeItem("dashboard-authorization");
-    localStorage.removeItem("dashboard-authorization");
+    sessionStorage.removeItem("dashboard-session-token");
     showLogin(error instanceof AuthenticationError ? "Usuario o contraseña incorrectos." : "No se pudo validar el acceso.");
   } finally {
     if (submit) { submit.disabled = false; submit.textContent = "Ingresar"; }
@@ -304,8 +310,7 @@ function logout(): void {
   studentData = null;
   teacherData = null;
   familyData = null;
-  sessionStorage.removeItem("dashboard-authorization");
-  localStorage.removeItem("dashboard-authorization");
+  sessionStorage.removeItem("dashboard-session-token");
   showLogin();
 }
 
@@ -431,12 +436,12 @@ function render(): void {
         </div>
       </article>
       <section class="metrics" aria-label="Indicadores generales">
-        ${metric("Total respuestas", data.summary.total, "violet", "↗")}
+        ${metric("Respuestas registradas", data.summary.total, "violet", "↗")}
         ${metric("Completas", data.summary.complete, "green", "✓")}
         ${metric("Incompletas", data.summary.incomplete, "orange", "◒")}
         ${metric("Completitud", formatPct(data.summary.completePct), "cyan", "≈")}
         ${metric("Escuelas con encuestas aplicadas", data.schools.length, "pink", "⌂")}
-        ${metric("Último corte", formatTime(data.generatedAt), "blue", "◷")}
+        ${metric("Datos de LimeSurvey", formatDateTime(data.generatedAt), "blue", "◷")}
       </section>
     </section>
     <section class="schools-panel panel">
@@ -606,11 +611,13 @@ function switchTab(tab: DashboardView): void {
   document.querySelector("#tracking-view")?.classList.toggle("hidden", tab !== "tracking");
   document.querySelector("#map-view")?.classList.toggle("hidden", tab !== "map");
   document.querySelector("#monitoring-view")?.classList.toggle("hidden", tab !== "monitoring");
-  if (tab === "map") window.setTimeout(initMap, 0);
+  if (tab === "map") window.setTimeout(() => void initMap(), 0);
 }
 
-function initMap(): void {
+async function initMap(): Promise<void> {
   if (map) { map.resize(); return; }
+  maplibreModule = await import("maplibre-gl");
+  const maplibregl = maplibreModule;
   map = new maplibregl.Map({
     container: "map",
     center: [-58.45, -34.61],
@@ -660,7 +667,7 @@ function updateMap(): void {
 }
 
 function updateSchoolMarkers(): void {
-  if (!map) return;
+  if (!map || !maplibreModule) return;
   schoolMarkers.forEach((marker) => marker.remove());
   schoolMarkers = [];
   for (const { location: school, summary } of visibleSurveyedSchools()) {
@@ -677,7 +684,7 @@ function updateSchoolMarkers(): void {
     const badge = document.createElement("span");
     badge.textContent = String(summary.total);
     element.append(badge);
-    const popup = new maplibregl.Popup({ offset: 32, closeButton: false }).setHTML(`
+    const popup = new maplibreModule.Popup({ offset: 32, closeButton: false }).setHTML(`
       <div class="school-popup">
         <p>${school.managementType === "state" ? `EES ${school.schoolNumber} · GESTIÓN ESTATAL` : "GESTIÓN PRIVADA"} · CUE ${escapeHtml(school.cue)}</p>
         <h3>${escapeHtml(school.name)}</h3>
@@ -685,7 +692,7 @@ function updateSchoolMarkers(): void {
         <strong>${summary.total} respuestas · ${summary.complete} completas · ${summary.incomplete} incompletas</strong>
       </div>
     `);
-    schoolMarkers.push(new maplibregl.Marker({ element, anchor: "bottom" })
+    schoolMarkers.push(new maplibreModule.Marker({ element, anchor: "bottom" })
       .setLngLat(school.coordinates)
       .setPopup(popup)
       .addTo(map));
@@ -693,8 +700,8 @@ function updateSchoolMarkers(): void {
 }
 
 function fitMap(): void {
-  if (!map) return;
-  const bounds = new maplibregl.LngLatBounds();
+  if (!map || !maplibreModule) return;
+  const bounds = new maplibreModule.LngLatBounds();
   const visible = visibleMapPoints();
   if (visible.length) visible.forEach((point) => {
     bounds.extend([point.lon, point.lat]);
@@ -747,11 +754,15 @@ function initializeFilters(): void {
 }
 
 function schoolDisplayName(school: SchoolSummary): string {
+  if (school.schoolNumber === 6 || /\balfonsina\b/i.test(school.school)) return "EES 6";
   if (school.schoolNumber === 47 || school.school.includes("408") || privateSchoolKey(school.school) === "eps 408 es47") return "EPS 408 (ES47)";
   return schoolLocationForSummary(school)?.name ?? school.school;
 }
 
 function schoolLocationForSummary(school: SchoolSummary): SchoolLocation | null {
+  if (school.schoolNumber === 6 || /\balfonsina\b/i.test(school.school)) {
+    return STATE_SCHOOLS.find((candidate) => candidate.schoolNumber === 6) ?? null;
+  }
   if (school.schoolNumber === 47 || school.school.includes("408")) {
     return STATE_SCHOOLS.find((candidate) => candidate.schoolNumber === 47) ?? null;
   }
@@ -830,14 +841,15 @@ function createTriangleImage(): ImageData {
   return context.getImageData(0, 0, 48, 48);
 }
 
-function showResponsePopup(event: maplibregl.MapLayerMouseEvent): void {
+function showResponsePopup(event: MapLayerMouseEvent): void {
   const feature = event.features?.[0];
   if (!feature || feature.geometry.type !== "Point") return;
   const properties = feature.properties as { school: string; managementType: ManagementType; complete: boolean | string };
   const coordinates = feature.geometry.coordinates as [number, number];
   const management = properties.managementType === "state" ? "Gestión estatal · círculo" : properties.managementType === "private" ? "Gestión privada · triángulo" : "Gestión no identificada";
   const complete = properties.complete === true || properties.complete === "true";
-  new maplibregl.Popup({ closeButton: false }).setLngLat(coordinates).setHTML(`<div class="school-popup"><p>PUNTO DE MATRÍCULA</p><h3>${escapeHtml(properties.school)}</h3><span>${management}</span><strong>${complete ? "Respuesta completa" : "Respuesta incompleta"}</strong></div>`).addTo(map!);
+  if (!maplibreModule) return;
+  new maplibreModule.Popup({ closeButton: false }).setLngLat(coordinates).setHTML(`<div class="school-popup"><p>PUNTO DE MATRÍCULA</p><h3>${escapeHtml(properties.school)}</h3><span>${management}</span><strong>${complete ? "Respuesta completa" : "Respuesta incompleta"}</strong></div>`).addTo(map!);
 }
 
 function updateMapAfterFilter(): void {
@@ -871,7 +883,7 @@ function renderMapStatus(): void {
   const visible = visibleMapPoints().length;
   const missingCoordinates = data.summary.total - data.mapPoints.length;
   const pointLabel = activePopulation === "students" ? "puntos de matrícula" : "ubicaciones individuales";
-  status.textContent = `${visible} de ${data.mapPoints.length} ${pointLabel} visibles · ${surveyedSchools().length} escuelas encuestadas ubicadas · ${data.summary.total} respuestas recibidas (${data.summary.complete} completas y ${data.summary.incomplete} incompletas) · ${missingCoordinates} sin coordenadas válidas`;
+  status.textContent = `${visible} de ${data.mapPoints.length} ${pointLabel} visibles · ${surveyedSchools().length} escuelas encuestadas ubicadas · ${data.summary.total} respuestas recibidas (${data.summary.complete} completas y ${data.summary.incomplete} incompletas) · ${missingCoordinates} sin ubicación válida en General San Martín`;
 }
 
 function colorFor(school: string): string {
@@ -902,7 +914,19 @@ function updateSyncLabel(): void {
   if (!label) return;
   if (!lastSuccessfulFetch) { label.textContent = "Iniciando enlace…"; return; }
   const seconds = Math.floor((Date.now() - lastSuccessfulFetch) / 1000);
-  label.textContent = warning ? `Último dato válido hace ${seconds} s` : `Actualizado hace ${seconds} s`;
+  label.textContent = warning ? `Última conexión válida hace ${seconds} s` : `Conexión comprobada hace ${seconds} s`;
+}
+
+function formatDateTime(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Sin informar";
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(parsed);
 }
 
 function renderWarning(): void {
@@ -932,7 +956,6 @@ function warningMarkup(): string {
 
 function formatNumber(value: number): string { return new Intl.NumberFormat("es-AR").format(value); }
 function formatPct(value: number): string { return `${new Intl.NumberFormat("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)} %`; }
-function formatTime(value: string): string { return new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }
 function formatDate(value: string): string {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return match ? `${match[3]}/${match[2]}/${match[1]}` : escapeHtml(value || "—");

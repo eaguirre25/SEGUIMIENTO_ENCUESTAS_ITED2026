@@ -1,5 +1,5 @@
 import { LimeSurveyClient } from "./limesurvey";
-import { buildDashboard } from "./normalize";
+import { buildDashboard, LEGACY_EXCLUDED_TEST_RESPONSE_KEYS } from "./normalize";
 import {
   DASHBOARD_EXPORT_FIELDS,
   FAMILY_DASHBOARD_EXPORT_FIELDS,
@@ -21,6 +21,16 @@ export default {
 
     if (request.method === "OPTIONS") {
       return cors ? new Response(null, { status: 204, headers: cors }) : jsonError("Origen no permitido", 403);
+    }
+    if (request.method === "POST" && url.pathname === "/api/session") {
+      if (origin && !cors) return jsonError("Origen no permitido", 403);
+      try {
+        assertEnv(env);
+        if (!(await isBasicAuthorized(request, env))) return unauthorized(cors);
+        return json({ token: await createSessionToken(env), expiresIn: 28_800 }, 200, cors);
+      } catch (error) {
+        return jsonError(errorMessage(error), 502, cors);
+      }
     }
     if (request.method !== "GET" || url.pathname !== "/api/dashboard") {
       return jsonError("No encontrado", 404, cors);
@@ -106,13 +116,26 @@ async function refreshDashboard(env: Env, population: DashboardPopulation): Prom
     env.LIMESURVEY_PASSWORD,
   );
   const raw = await client.exportAllResponses(Number(config.surveyId), config.exportFields);
-  const serialized = JSON.stringify(buildDashboard(raw, config.surveyId, config.questionMap));
+  const exclusions = await readExcludedResponseKeys(env);
+  const serialized = JSON.stringify(buildDashboard(raw, config.surveyId, config.questionMap, new Date().toISOString(), exclusions));
   await env.DASHBOARD_DB.prepare(`
     INSERT INTO dashboard_population_cache (population, payload, updated_at)
     VALUES (?1, ?2, datetime('now'))
     ON CONFLICT(population) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at
   `).bind(population, serialized).run();
   return serialized;
+}
+
+async function readExcludedResponseKeys(env: Env): Promise<ReadonlySet<string>> {
+  try {
+    const rows = await env.DASHBOARD_DB.prepare(
+      "SELECT response_key FROM dashboard_excluded_responses",
+    ).all<{ response_key: string }>();
+    return new Set(rows.results.map((row) => row.response_key));
+  } catch (error) {
+    console.error(JSON.stringify({ message: "excluded responses table unavailable; using legacy list", error: errorMessage(error) }));
+    return LEGACY_EXCLUDED_TEST_RESPONSE_KEYS;
+  }
 }
 
 function parsePopulation(value: string | null): DashboardPopulation | null {
@@ -173,7 +196,7 @@ function corsHeaders(origin: string | null, allowed: string): Headers | undefine
   if (origin !== allowed && !localAllowed) return undefined;
   return new Headers({
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Accept, Authorization, Cache-Control, Content-Type, Pragma",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
@@ -206,6 +229,12 @@ function jsonError(message: string, status: number, cors?: Headers): Response {
 
 async function isAuthorized(request: Request, env: Env): Promise<boolean> {
   const authorization = request.headers.get("Authorization");
+  if (authorization?.startsWith("Bearer ")) return verifySessionToken(authorization.slice(7), env);
+  return isBasicAuthorized(request, env);
+}
+
+async function isBasicAuthorized(request: Request, env: Env): Promise<boolean> {
+  const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Basic ")) return false;
   let decoded: string;
   try {
@@ -224,6 +253,51 @@ async function isAuthorized(request: Request, env: Env): Promise<boolean> {
     secureEqual(password, env.DASHBOARD_PASSWORD),
   ]);
   return usernameMatches && passwordMatches;
+}
+
+async function createSessionToken(env: Env): Promise<string> {
+  const payload = base64UrlEncode(JSON.stringify({
+    u: env.DASHBOARD_USERNAME,
+    exp: Math.floor(Date.now() / 1000) + 28_800,
+  }));
+  return `${payload}.${await sign(payload, env.DASHBOARD_PASSWORD)}`;
+}
+
+async function verifySessionToken(token: string, env: Env): Promise<boolean> {
+  const [payload, signature, extra] = token.split(".");
+  if (!payload || !signature || extra) return false;
+  if (!(await secureEqual(signature, await sign(payload, env.DASHBOARD_PASSWORD)))) return false;
+  try {
+    const parsed = JSON.parse(base64UrlDecode(payload)) as { u?: unknown; exp?: unknown };
+    return parsed.u === env.DASHBOARD_USERNAME
+      && typeof parsed.exp === "number"
+      && parsed.exp > Math.floor(Date.now() / 1000);
+  } catch {
+    return false;
+  }
+}
+
+async function sign(value: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(value));
+  return bytesToBase64Url(new Uint8Array(signature));
+}
+
+function base64UrlEncode(value: string): string {
+  return bytesToBase64Url(new TextEncoder().encode(value));
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlDecode(value: string): string {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const binary = atob(padded);
+  return new TextDecoder().decode(Uint8Array.from(binary, (character) => character.charCodeAt(0)));
 }
 
 async function secureEqual(left: string, right: string): Promise<boolean> {

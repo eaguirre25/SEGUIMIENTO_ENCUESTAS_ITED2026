@@ -7,12 +7,12 @@ Aplicación de lectura para seguir el operativo de estudiantes sin exponer crede
 ```text
 LimeSurvey Cloud
   → RemoteControl 2 (JSON-RPC)
-  → Cloudflare Worker (normalización, acceso protegido y caché de 20 s)
+  → Cloudflare Worker (normalización, acceso protegido y caché persistente en D1)
   → GET /api/dashboard
   → dashboard estático Vite + TypeScript + MapLibre + capa oficial de escuelas
 ```
 
-El Worker abre una sesión, exporta respuestas completas e incompletas con `export_responses` y libera la session key en un bloque `finally`. El navegador nunca se conecta a LimeSurvey. El HTML público no contiene datos: el Worker exige usuario y contraseña antes de entregar métricas o ubicaciones.
+El Worker abre una sesión, exporta respuestas completas e incompletas con `export_responses` y libera la session key en un bloque `finally`. El navegador nunca se conecta a LimeSurvey. El HTML público no contiene datos: el Worker intercambia el usuario y la contraseña por un token firmado de ocho horas, que se conserva únicamente en `sessionStorage`. La opción de recordar guarda sólo el nombre de usuario.
 
 Producción:
 
@@ -208,7 +208,7 @@ Las variables que empiezan por `VITE_` son públicas por diseño; nunca colocar 
 
 El mapa conserva los puntos de matrícula en sus coordenadas informadas y muestra únicamente establecimientos con encuestas aplicadas y ubicación institucional comprobada. Cada escuela se representa con un ícono de edificio; los hilos relacionan la matrícula con su escuela y el mapa de calor transforma los puntos de matrícula visibles.
 
-El nombre se normaliza con `trim`, espacios consecutivos y una clave en minúsculas. Se conserva como etiqueta la primera variante limpia observada. No se hace fuzzy matching.
+El nombre se normaliza con `trim`, espacios consecutivos y una clave en minúsculas. Las variantes que contienen “Alfonsina” y las formas inequívocas de EES/ES/Media N.º 6 se consolidan como `EES 6`. No se hace fuzzy matching general.
 
 ## Verificación
 
@@ -220,7 +220,7 @@ npm run typecheck
 npm run build
 ```
 
-Las pruebas cubren normalización de escuela, completitud, cursos 1–7, porcentajes, coordenadas, contrato final, privacidad y la identidad `completas + incompletas = total`.
+Las pruebas cubren normalización de escuela, alias de EES 6, completitud, cursos 1–7, porcentajes, límites territoriales de coordenadas, sesión temporal, contrato final, privacidad y la identidad `completas + incompletas = total`.
 
 ## Poblaciones conectadas
 
@@ -230,7 +230,13 @@ El panel lee tres encuestas de LimeSurvey con cachés independientes:
 - Docentes y equipos de conducción: `985318` (`population=teachers`).
 - Familias: `997168` (`population=families`).
 
-La página inicial **Panorama general de la encuesta** combina esas tres cachés sin alterar las vistas específicas. Presenta totales, composición por población, respuestas por escuela y año, demografía agregada, cobertura y evolución temporal. Su filtro de escuela mantiene un estado independiente de los filtros de las vistas por población.
+La página inicial **Panorama general de la encuesta** combina esas tres cachés sin alterar las vistas específicas. Presenta respuestas registradas, composición por población, respuestas por escuela y año, demografía agregada, casos sin escuela o año, cobertura y evolución temporal. Edad y género pueden filtrarse por población. Los porcentajes por escuela usan como denominador las respuestas con escuela identificada; los porcentajes por año usan los casos con año válido.
+
+El navegador comprueba la API cada 60 segundos. El Worker actualiza las tres cachés cada minuto de lunes a viernes entre las 08:00 y las 22:59, hora de Buenos Aires. La interfaz distingue la última conexión exitosa de la fecha real de generación de los datos.
+
+Las coordenadas del mapa se validan dentro de un área territorial razonable de General San Martín. Los valores ausentes, inválidos o externos al área no se publican como puntos y se informan en el contador de ubicaciones descartadas.
+
+Las exclusiones de respuestas de prueba se administran en la tabla D1 `dashboard_excluded_responses`. Las migraciones se aplican automáticamente antes del despliegue del Worker.
 
 Para Familias, el seguimiento muestra fecha, hora, vínculo con el/la estudiante, escuela informada, pertenencia a General San Martín, año y estado completa/incompleta. Si la escuela local se responde como un número o dentro de un texto inequívoco (por ejemplo, `13` o `Escuela 13`), se normaliza como `EES 13`. Cuando la familia indica que la escuela no pertenece a General San Martín, el nombre se conserva como fue informado y no se mezcla con una escuela local del mismo número.
 

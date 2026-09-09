@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildDashboard, detectCompletion, normalizeGender, normalizeSchool, parseAgeGroup, parseCourseYear, parseSchoolNumber, parseYesNo, splitTimestamp } from "../src/normalize";
+import { buildDashboard, detectCompletion, isCoordinateInSanMartin, normalizeGender, normalizeSchool, parseAgeGroup, parseCourseYear, parseSchoolNumber, parseYesNo, splitTimestamp } from "../src/normalize";
 import { decodeExport, LimeSurveyClient } from "../src/limesurvey";
 import {
   DASHBOARD_EXPORT_FIELDS,
@@ -180,6 +180,18 @@ describe("normalización", () => {
     expect(result.monitoringRows.filter((row) => row.school === "Alfonsina Storni")).toHaveLength(3);
   });
 
+  it("unifica todas las variantes inequívocas de Alfonsina y EES 6", () => {
+    for (const variant of ["Alfonsina", "Alfonsina Storni", "Instituto Alfonsina", "E.E.S. N6", "EES6", "ES 6", "Media 6", "Escuela Secundaria N.º 6"]) {
+      expect(normalizeSchool(variant)?.original).toBe("EES 6");
+    }
+  });
+
+  it("distingue coordenadas plausibles de General San Martín", () => {
+    expect(isCoordinateInSanMartin(-34.57, -58.54)).toBe(true);
+    expect(isCoordinateInSanMartin(0, 0)).toBe(false);
+    expect(isCoordinateInSanMartin(-34, -58)).toBe(false);
+  });
+
   it("toma la primera rama de escuela informada", () => {
     const branchedMap: QuestionMap = { ...map, SCHOOL: ["school_choice", "school_other"] };
     const result = buildDashboard(
@@ -256,9 +268,9 @@ describe("normalización", () => {
 describe("agregación segura", () => {
   const result = buildDashboard(
     [
-      { school: "EES 1", year: "1", submitdate: "2026-08-12", lat: "-34.5", lon: "-58.4", address: "privada" },
-      { school: " ees 1 ", year: "1.º año", submitdate: null, lat: "999", lon: "-58.3" },
-      { school: "EES 2", year: "7", submitdate: "2026-08-12", lat: "-35,1", lon: "-59,2" },
+      { school: "EES 1", year: "1", submitdate: "2026-08-12", lat: "-34.57", lon: "-58.54", address: "privada" },
+      { school: " ees 1 ", year: "1.º año", submitdate: null, lat: "999", lon: "-58.53" },
+      { school: "EES 2", year: "7", submitdate: "2026-08-12", lat: "-34,58", lon: "-58,55" },
     ],
     "977929",
     map,
@@ -470,7 +482,7 @@ describe("agregación segura", () => {
 
   it("cuenta en el total las respuestas sin escuela y conserva su punto como no identificado", () => {
     const withMissingSchool = buildDashboard(
-      [{ school: "", year: "2", submitdate: null, lat: -34, lon: -58 }],
+      [{ school: "", year: "2", submitdate: null, lat: -34.57, lon: -58.54 }],
       "977929",
       map,
     );
@@ -481,8 +493,8 @@ describe("agregación segura", () => {
       schoolNumber: null,
       managementType: "unknown",
       complete: false,
-      lat: -34,
-      lon: -58,
+      lat: -34.57,
+      lon: -58.54,
     }]);
   });
 });

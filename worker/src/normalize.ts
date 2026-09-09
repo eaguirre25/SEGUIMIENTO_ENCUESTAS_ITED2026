@@ -16,7 +16,7 @@ type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL" | "ROLE" | "ROLE_O
 export type QuestionMap = Omit<Record<keyof typeof QUESTION_MAP, string | readonly string[] | null>, OptionalSchoolBranch>
   & Partial<Record<OptionalSchoolBranch, string | readonly string[] | null>>;
 
-const EXCLUDED_TEST_RESPONSE_KEYS = new Set([
+export const LEGACY_EXCLUDED_TEST_RESPONSE_KEYS = new Set([
   "2026-08-12|09:18:21|ees26|00|state|3|complete",
   "2026-08-12|09:05:59|ees 1|1|state|1|complete",
   "2026-08-11|23:24:09|sin informar|s6|unknown|4|incomplete",
@@ -26,6 +26,13 @@ const EXCLUDED_TEST_RESPONSE_KEYS = new Set([
 const STATE_SCHOOL_NUMBER_ALIASES: Readonly<Record<string, number>> = {
   "alfonsina storni": 6,
 };
+
+const SAN_MARTIN_BOUNDS = {
+  minLat: -34.66,
+  maxLat: -34.49,
+  minLon: -58.66,
+  maxLon: -58.43,
+} as const;
 
 export const AGE_GROUPS: readonly AgeGroup[] = [
   "Hasta 15", "16–18", "19–29", "30–39", "40–49", "50–59", "60 o más",
@@ -45,6 +52,7 @@ export function normalizeSchool(value: unknown): { original: string; key: string
 function canonicalSchoolLabel(value: string): string {
   if (!value) return value;
   const folded = foldSchoolText(value);
+  if (isEes6Alias(folded)) return "EES 6";
   if (
     /408/.test(folded) ||
     /^eps(?: |$)/.test(folded) ||
@@ -73,7 +81,15 @@ function parseStateSchoolNumber(value: unknown): number | null {
   const parsed = parseSchoolNumber(value);
   if (parsed !== null) return parsed;
   if (typeof value !== "string") return null;
-  return STATE_SCHOOL_NUMBER_ALIASES[foldSchoolText(value)] ?? null;
+  const folded = foldSchoolText(value);
+  if (isEes6Alias(folded)) return 6;
+  return STATE_SCHOOL_NUMBER_ALIASES[folded] ?? null;
+}
+
+function isEes6Alias(folded: string): boolean {
+  if (/\balfonsina\b/.test(folded)) return true;
+  const compact = folded.replace(/\s+/g, "");
+  return /^(?:ees|es|media|escuelasecundaria)(?:n|no|numero)?0*6(?:\D|$)/.test(compact);
 }
 
 function foldSchoolText(value: string): string {
@@ -137,6 +153,11 @@ export function parseCoordinate(value: unknown, kind: "lat" | "lon"): number | n
   const parsed = Number(String(value).trim().replace(",", "."));
   const limit = kind === "lat" ? 90 : 180;
   return Number.isFinite(parsed) && parsed >= -limit && parsed <= limit ? parsed : null;
+}
+
+export function isCoordinateInSanMartin(lat: number, lon: number): boolean {
+  return lat >= SAN_MARTIN_BOUNDS.minLat && lat <= SAN_MARTIN_BOUNDS.maxLat
+    && lon >= SAN_MARTIN_BOUNDS.minLon && lon <= SAN_MARTIN_BOUNDS.maxLon;
 }
 
 export function normalizeResponse(raw: RawResponse, map: QuestionMap): NormalizedResponse | null {
@@ -312,8 +333,9 @@ export function buildDashboard(
   surveyId: string,
   map: QuestionMap = QUESTION_MAP,
   generatedAt = new Date().toISOString(),
+  excludedResponseKeys: ReadonlySet<string> = LEGACY_EXCLUDED_TEST_RESPONSE_KEYS,
 ): DashboardPayload {
-  const includedResponses = rawResponses.filter((raw) => !isExcludedTestResponse(raw, map));
+  const includedResponses = rawResponses.filter((raw) => !isExcludedTestResponse(raw, map, excludedResponseKeys));
   const normalized = includedResponses.flatMap((raw) => {
     const item = normalizeResponse(raw, map);
     return item ? [item] : [];
@@ -381,7 +403,7 @@ export function buildDashboard(
     mapPoints: includedResponses.flatMap((raw) => {
       const lat = map.LATITUDE ? parseCoordinate(readMappedValue(raw, map.LATITUDE), "lat") : null;
       const lon = map.LONGITUDE ? parseCoordinate(readMappedValue(raw, map.LONGITUDE), "lon") : null;
-      if (lat === null || lon === null) return [];
+      if (lat === null || lon === null || !isCoordinateInSanMartin(lat, lon)) return [];
       const identity = identifySchool(raw, map);
       return [{
         school: identity?.school.original ?? "Sin escuela identificada",
@@ -398,8 +420,12 @@ export function buildDashboard(
   };
 }
 
-export function isExcludedTestResponse(raw: RawResponse, map: QuestionMap = QUESTION_MAP): boolean {
-  return EXCLUDED_TEST_RESPONSE_KEYS.has(monitoringRowKey(toMonitoringRow(raw, map)));
+export function isExcludedTestResponse(
+  raw: RawResponse,
+  map: QuestionMap = QUESTION_MAP,
+  excludedResponseKeys: ReadonlySet<string> = LEGACY_EXCLUDED_TEST_RESPONSE_KEYS,
+): boolean {
+  return excludedResponseKeys.has(monitoringRowKey(toMonitoringRow(raw, map)));
 }
 
 function toMonitoringRow(raw: RawResponse, map: QuestionMap): LoadMonitoringRow {

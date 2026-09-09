@@ -33,6 +33,22 @@ describe("protección del dashboard", () => {
     expect(response.status).toBe(401);
   });
 
+  it("intercambia las credenciales por un token temporal y acepta Bearer", async () => {
+    const login = await worker.fetch(new Request("https://worker.example/api/session", {
+      method: "POST",
+      headers: { Origin: env.DASHBOARD_ALLOWED_ORIGIN, Authorization: `Basic ${btoa("viewer:strong-password")}` },
+    }), env);
+    expect(login.status).toBe(200);
+    const session = await login.json() as { token: string; expiresIn: number };
+    expect(session.expiresIn).toBe(28_800);
+    expect(session.token.split(".")).toHaveLength(2);
+
+    const authorized = await worker.fetch(new Request("https://worker.example/api/dashboard?population=otra", {
+      headers: { Origin: env.DASHBOARD_ALLOWED_ORIGIN, Authorization: `Bearer ${session.token}` },
+    }), env);
+    expect(authorized.status).toBe(400);
+  });
+
   it("autoriza los encabezados de autenticación y recarga en la preflight CORS", async () => {
     const response = await worker.fetch(new Request("https://worker.example/api/dashboard", {
       method: "OPTIONS",

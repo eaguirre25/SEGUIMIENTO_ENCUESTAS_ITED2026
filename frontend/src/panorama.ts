@@ -19,6 +19,7 @@ interface CombinedSchool {
 
 let selectedSchoolId = "all";
 let ageScope: "all" | Population = "all";
+let genderScope: "all" | Population = "all";
 
 export function renderPanoramaGeneral(root: HTMLElement, payloads: PopulationData): void {
   const schools = combineSchools(payloads);
@@ -31,8 +32,11 @@ export function renderPanoramaGeneral(root: HTMLElement, payloads: PopulationDat
     : POPULATIONS.reduce((sum, population) => sum + payloads[population].summary.complete, 0);
   const visibleSchools = selectedSchool ? [selectedSchool] : schools;
   const demographics = demographicFor(payloads, selectedSchool, ageScope);
-  const allDemographics = demographicFor(payloads, selectedSchool, "all");
+  const genderDemographics = demographicFor(payloads, selectedSchool, genderScope);
   const studentYears = studentYearCounts(payloads.students, selectedSchool?.schools.students ?? null);
+  const studentsWithYear = studentYears.reduce((sum, count) => sum + count, 0);
+  const studentsWithoutYear = Math.max(0, totals.students - studentsWithYear);
+  const unidentified = unidentifiedSchoolCounts(payloads);
   const timeline = timelineMarkup(payloads, selectedSchool);
 
   root.innerHTML = `
@@ -47,23 +51,24 @@ export function renderPanoramaGeneral(root: HTMLElement, payloads: PopulationDat
       </label>
     </section>
     <section class="panorama-kpis" aria-label="Indicadores generales">
-      ${kpi("Total de encuestas realizadas", total, `${formatNumber(complete)} completas · ${formatNumber(total - complete)} incompletas`, "total")}
+      ${kpi("Total de respuestas registradas", total, `${formatNumber(complete)} completas · ${formatNumber(total - complete)} incompletas`, "total")}
       ${kpi("Estudiantes", totals.students, percentCaption(totals.students, total), "students")}
       ${kpi("Docentes", totals.teachers, percentCaption(totals.teachers, total), "teachers")}
       ${kpi("Familias", totals.families, percentCaption(totals.families, total), "families")}
       ${kpi("Escuelas con respuestas", visibleSchools.filter((school) => school.total > 0).length, selectedSchool ? "en la selección actual" : "establecimientos identificados", "schools")}
     </section>
     <section class="panorama-grid panorama-grid-wide">
-      ${panel("Encuestas por escuela", "Total y composición por población", schoolBars(visibleSchools))}
+      ${panel("Respuestas por escuela", "Porcentaje sobre respuestas con escuela identificada", schoolBars(visibleSchools))}
       ${panel("Composición total por población", "Cantidad y porcentaje sobre el total", populationBars(totals))}
     </section>
     <section class="panorama-grid">
-      ${panel("Encuestas de estudiantes por año", "Respuestas capturadas · orden de 1.º a 7.º", simpleBars(studentYears.map((count, index) => ({ label: `${index + 1}.º`, count })), totals.students, "#a855f7"))}
+      ${panel("Respuestas de estudiantes por año", `${formatNumber(studentsWithYear)} con año válido · ${formatNumber(studentsWithoutYear)} sin año`, simpleBars(studentYears.map((count, index) => ({ label: `${index + 1}.º`, count })), studentsWithYear, "#a855f7"))}
       ${panel("Edad de quienes respondieron", `${formatNumber(demographics.validAges)} respuestas con edad válida`, `${ageSelector()}${simpleBars(AGE_GROUPS.map((label) => ({ label, count: demographics.ageGroups[label] })), demographics.validAges, "#22d3ee")}`)}
-      ${panel("Género", `${formatNumber(allDemographics.validGenders)} respuestas con dato válido`, simpleBars(allDemographics.genders, allDemographics.validGenders, "#f472b6"))}
+      ${panel("Género", `${formatNumber(genderDemographics.validGenders)} respuestas con dato válido`, `${genderSelector()}${simpleBars(genderDemographics.genders, genderDemographics.validGenders, "#f472b6")}`)}
     </section>
     ${panel("Cobertura por escuela y población", "La intensidad representa la cantidad de respuestas", coverageMatrix(visibleSchools), "panorama-full")}
     ${coverageCards(schools, selectedSchool)}
+    ${selectedSchool ? "" : missingDataCards(unidentified, studentsWithoutYear)}
     ${timeline}
     <p class="panorama-footnote">Edad y género se reciben como agregados anónimos. Los porcentajes excluyen valores vacíos o inválidos.</p>
   `;
@@ -76,6 +81,10 @@ export function renderPanoramaGeneral(root: HTMLElement, payloads: PopulationDat
     ageScope = button.dataset.ageScope as "all" | Population;
     renderPanoramaGeneral(root, payloads);
   }));
+  root.querySelectorAll<HTMLButtonElement>("[data-gender-scope]").forEach((button) => button.addEventListener("click", () => {
+    genderScope = button.dataset.genderScope as "all" | Population;
+    renderPanoramaGeneral(root, payloads);
+  }));
 }
 
 function combineSchools(payloads: PopulationData): CombinedSchool[] {
@@ -84,8 +93,9 @@ function combineSchools(payloads: PopulationData): CombinedSchool[] {
     for (const school of payloads[population].schools) {
       const id = schoolId(school);
       const f = fold(school.school);
+      const isEes6 = school.schoolNumber === 6 || /\balfonsina\b/.test(f) || /^(?:ees|es|media|escuela secundaria) ?(?:n )?0*6(?: |$)/.test(f);
       const isEps47 = id === "state:47" || id === "institution:eps-47-408" || school.schoolNumber === 47 || f.includes("408") || f === "eps 408 es47";
-      const canonicalLabel = isEps47 ? "EPS 408 (ES47)" : school.school;
+      const canonicalLabel = isEes6 ? "EES 6" : isEps47 ? "EPS 408 (ES47)" : school.school;
       const current = combined.get(id) ?? {
         id,
         label: canonicalLabel,
@@ -97,7 +107,10 @@ function combineSchools(payloads: PopulationData): CombinedSchool[] {
       current.schools[population] = school;
       current.counts[population] += school.total;
       current.total += school.total;
-      if (isEps47) {
+      if (isEes6) {
+        current.label = "EES 6";
+        current.managementType = "state";
+      } else if (isEps47) {
         current.label = "EPS 408 (ES47)";
       } else if (school.managementType === "state" && current.managementType !== "state") {
         current.label = school.school;
@@ -111,6 +124,7 @@ function combineSchools(payloads: PopulationData): CombinedSchool[] {
 
 function schoolId(school: SchoolSummary): string {
   const f = fold(school.school);
+  if (school.schoolNumber === 6 || /\balfonsina\b/.test(f) || /^(?:ees|es|media|escuela secundaria) ?(?:n )?0*6(?: |$)/.test(f)) return "state:6";
   if (school.schoolNumber === 47 || f.includes("408") || f === "eps 408 es47" || f === "eps 47 408" || f === "ees 47 408" || f === "ees47 408" || f === "ees 47") return "state:47";
   if (school.schoolNumber !== null) return `state:${school.schoolNumber}`;
   return `${school.managementType}:${fold(school.school)}`;
@@ -209,6 +223,29 @@ function ageSelector(): string {
   return `<div class="age-selector" role="group" aria-label="Población para distribución de edad">${choices.map(([value, label]) => `<button type="button" data-age-scope="${value}" class="${ageScope === value ? "active" : ""}">${label}</button>`).join("")}</div>`;
 }
 
+function genderSelector(): string {
+  const choices: Array<["all" | Population, string]> = [["all", "Todos"], ["students", "Estudiantes"], ["teachers", "Docentes"], ["families", "Familias"]];
+  return `<div class="age-selector" role="group" aria-label="Población para distribución de género">${choices.map(([value, label]) => `<button type="button" data-gender-scope="${value}" class="${genderScope === value ? "active" : ""}">${label}</button>`).join("")}</div>`;
+}
+
+function unidentifiedSchoolCounts(payloads: PopulationData): Record<Population, number> {
+  return Object.fromEntries(POPULATIONS.map((population) => {
+    const identified = payloads[population].schools.reduce((sum, school) => sum + school.total, 0);
+    return [population, Math.max(0, payloads[population].summary.total - identified)];
+  })) as Record<Population, number>;
+}
+
+function missingDataCards(unidentified: Record<Population, number>, studentsWithoutYear: number): string {
+  const total = POPULATIONS.reduce((sum, population) => sum + unidentified[population], 0);
+  return `<section class="coverage-kpis missing-data-kpis">
+    ${coverageKpi("Sin escuela identificada", total, "respuestas")}
+    ${coverageKpi("Estudiantes sin escuela", unidentified.students, "respuestas")}
+    ${coverageKpi("Docentes sin escuela", unidentified.teachers, "respuestas")}
+    ${coverageKpi("Familias sin escuela", unidentified.families, "respuestas")}
+    ${coverageKpi("Estudiantes sin año", studentsWithoutYear, "respuestas")}
+  </section>`;
+}
+
 function coverageMatrix(schools: CombinedSchool[]): string {
   if (!schools.length) return emptyChart("No hay escuelas identificadas para esta selección.");
   const maximum = Math.max(...schools.flatMap((school) => POPULATIONS.map((population) => school.counts[population])), 1);
@@ -228,7 +265,7 @@ function coverageCards(schools: CombinedSchool[], selectedSchool: CombinedSchool
     ${coverageKpi("Con estudiantes", counts.students, "escuelas")}
     ${coverageKpi("Con docentes", counts.teachers, "escuelas")}
     ${coverageKpi("Con familias", counts.families, "escuelas")}
-    ${coverageKpi("Cobertura completa", complete, "Estudiantes + docentes + familias")}
+    ${coverageKpi("Con las tres poblaciones", complete, "Estudiantes + docentes + familias")}
   </section>`;
 }
 
