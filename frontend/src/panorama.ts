@@ -93,7 +93,7 @@ function combineSchools(payloads: PopulationData): CombinedSchool[] {
     for (const school of payloads[population].schools) {
       const id = schoolId(school);
       const f = fold(school.school);
-      const isEes6 = school.schoolNumber === 6 || /\balfonsina\b/.test(f) || /^(?:ees|es|media|escuela secundaria) ?(?:n )?0*6(?: |$)/.test(f);
+      const isEes6 = school.schoolNumber === 6 || /\balfon[cs]ina\b/.test(f) || ["e e s", "a estudiar", "hh"].includes(f) || /^(?:ees|es|media|escuela secundaria) ?(?:n )?0*6(?: |$)/.test(f);
       const isEps47 = id === "state:47" || id === "institution:eps-47-408" || school.schoolNumber === 47 || f.includes("408") || f === "eps 408 es47";
       const canonicalLabel = isEes6 ? "EES 6" : isEps47 ? "EPS 408 (ES47)" : school.school;
       const current = combined.get(id) ?? {
@@ -124,7 +124,7 @@ function combineSchools(payloads: PopulationData): CombinedSchool[] {
 
 function schoolId(school: SchoolSummary): string {
   const f = fold(school.school);
-  if (school.schoolNumber === 6 || /\balfonsina\b/.test(f) || /^(?:ees|es|media|escuela secundaria) ?(?:n )?0*6(?: |$)/.test(f)) return "state:6";
+  if (school.schoolNumber === 6 || /\balfon[cs]ina\b/.test(f) || ["e e s", "a estudiar", "hh"].includes(f) || /^(?:ees|es|media|escuela secundaria) ?(?:n )?0*6(?: |$)/.test(f)) return "state:6";
   if (school.schoolNumber === 47 || f.includes("408") || f === "eps 408 es47" || f === "eps 47 408" || f === "ees 47 408" || f === "ees47 408" || f === "ees 47") return "state:47";
   if (school.schoolNumber !== null) return `state:${school.schoolNumber}`;
   return `${school.managementType}:${fold(school.school)}`;

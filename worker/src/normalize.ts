@@ -25,6 +25,10 @@ export const LEGACY_EXCLUDED_TEST_RESPONSE_KEYS = new Set([
 
 const STATE_SCHOOL_NUMBER_ALIASES: Readonly<Record<string, number>> = {
   "alfonsina storni": 6,
+  "alfoncina storni": 6,
+  "e e s": 6,
+  "a estudiar": 6,
+  "hh": 6,
 };
 
 const SAN_MARTIN_BOUNDS = {
@@ -53,6 +57,7 @@ function canonicalSchoolLabel(value: string): string {
   if (!value) return value;
   const folded = foldSchoolText(value);
   if (isEes6Alias(folded)) return "EES 6";
+  if (isEsn4Alias(folded)) return "ESN4";
   if (
     /408/.test(folded) ||
     /^eps(?: |$)/.test(folded) ||
@@ -66,6 +71,7 @@ function canonicalSchoolLabel(value: string): string {
   const number = String(schoolNumber);
   const onlyNumber = folded === String(Number(folded));
   const schoolMarker = new RegExp(`(?:^| )(?:eesn|ees|ee|es|n|numero|escuela|secundaria|media|md) *0*${number}(?: |$)`).test(folded);
+  if (schoolNumber === 4 && (onlyNumber || schoolMarker)) return "ESN4";
   return onlyNumber || schoolMarker ? `EES ${number}` : value;
 }
 
@@ -87,9 +93,16 @@ function parseStateSchoolNumber(value: unknown): number | null {
 }
 
 function isEes6Alias(folded: string): boolean {
-  if (/\balfonsina\b/.test(folded)) return true;
+  if (/\balfon[cs]ina\b/.test(folded)) return true;
+  if (["e e s", "a estudiar", "hh"].includes(folded)) return true;
   const compact = folded.replace(/\s+/g, "");
   return /^(?:ees|es|media|escuelasecundaria)(?:n|no|numero)?0*6(?:\D|$)/.test(compact);
+}
+
+function isEsn4Alias(folded: string): boolean {
+  if (/\bricardo rojas\b/.test(folded)) return true;
+  const compact = folded.replace(/\s+/g, "");
+  return /^(?:ees|es|esn|media|secundaria|escuelasecundaria|escueladeeducacionsecundaria)(?:n|no|numero)?0*4(?:\D|$)/.test(compact);
 }
 
 function foldSchoolText(value: string): string {

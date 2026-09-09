@@ -208,7 +208,7 @@ Las variables que empiezan por `VITE_` son públicas por diseño; nunca colocar 
 
 El mapa conserva los puntos de matrícula en sus coordenadas informadas y muestra únicamente establecimientos con encuestas aplicadas y ubicación institucional comprobada. Cada escuela se representa con un ícono de edificio; los hilos relacionan la matrícula con su escuela y el mapa de calor transforma los puntos de matrícula visibles.
 
-El nombre se normaliza con `trim`, espacios consecutivos y una clave en minúsculas. Las variantes que contienen “Alfonsina” y las formas inequívocas de EES/ES/Media N.º 6 se consolidan como `EES 6`. No se hace fuzzy matching general.
+El nombre se normaliza con `trim`, espacios consecutivos y una clave en minúsculas. Las variantes que contienen “Alfonsina” o “Alfoncina” y las formas inequívocas de EES/ES/Media N.º 6 se consolidan como `EES 6`. Por decisión específica del relevamiento, `E.E.s`, `A estudiar` y `Hh` también integran ese grupo. Las variantes de EES 4, Secundaria 4 y Ricardo Rojas se consolidan como `ESN4`. Estas mismas reglas se vuelven a aplicar en el frontend para integrar correctamente cachés generadas por versiones anteriores del Worker. No se hace fuzzy matching general.
 
 ## Verificación
 

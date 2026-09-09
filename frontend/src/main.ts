@@ -194,9 +194,12 @@ async function refresh(): Promise<void> {
     return;
   }
   try {
-    const [students, teachers, families] = DATA_MODE === "demo"
+    const [studentRaw, teacherRaw, familyRaw] = DATA_MODE === "demo"
       ? [demoPayload(), emptyPayload(), emptyPayload()]
       : await Promise.all([fetchApi("students"), fetchApi("teachers"), fetchApi("families")]);
+    const students = canonicalizePayload(studentRaw);
+    const teachers = canonicalizePayload(teacherRaw);
+    const families = canonicalizePayload(familyRaw);
     validatePayload(students);
     validatePayload(teachers);
     validatePayload(families);
@@ -244,11 +247,14 @@ async function handleLogin(event: SubmitEvent): Promise<void> {
   const submit = document.querySelector<HTMLButtonElement>("#login-form button[type='submit']");
   if (submit) { submit.disabled = true; submit.textContent = "Verificando…"; }
   try {
-    const [students, teachers, families] = await Promise.all([
+    const [studentRaw, teacherRaw, familyRaw] = await Promise.all([
       fetchApi("students"),
       fetchApi("teachers"),
       fetchApi("families"),
     ]);
+    const students = canonicalizePayload(studentRaw);
+    const teachers = canonicalizePayload(teacherRaw);
+    const families = canonicalizePayload(familyRaw);
     validatePayload(students);
     validatePayload(teachers);
     validatePayload(families);
@@ -343,6 +349,94 @@ function emptyDemographics(): DashboardPayload["demographics"] {
     validGenders: 0,
     genders: [],
   };
+}
+
+function canonicalizePayload(payload: DashboardPayload): DashboardPayload {
+  const schools = new Map<string, SchoolSummary>();
+  for (const source of payload.schools) {
+    const identity = canonicalSchoolIdentity(source.school, source.schoolNumber, source.managementType);
+    const key = `${identity.managementType}:${identity.schoolNumber ?? foldSchoolLabel(identity.school)}`;
+    const current = schools.get(key) ?? emptySchoolSummary(identity.school, identity.schoolNumber, identity.managementType);
+    mergeSchoolSummary(current, source);
+    schools.set(key, current);
+  }
+  return {
+    ...payload,
+    schools: [...schools.values()]
+      .map(finishSchoolSummary)
+      .sort((left, right) => right.total - left.total || left.school.localeCompare(right.school, "es")),
+    mapPoints: payload.mapPoints.map((point) => ({
+      ...point,
+      ...canonicalSchoolIdentity(point.school, point.schoolNumber, point.managementType),
+    })),
+    monitoringRows: payload.monitoringRows.map((row) => {
+      const identity = canonicalSchoolIdentity(row.school, null, row.managementType);
+      return { ...row, school: identity.school, managementType: identity.managementType };
+    }),
+  };
+}
+
+function canonicalSchoolIdentity(school: string, schoolNumber: number | null, managementType: ManagementType): Pick<SchoolSummary, "school" | "schoolNumber" | "managementType"> {
+  const folded = foldSchoolLabel(school);
+  const compact = folded.replace(/\s+/g, "");
+  const ees6 = schoolNumber === 6
+    || /\balfon[cs]ina\b/.test(folded)
+    || ["e e s", "a estudiar", "hh"].includes(folded)
+    || /^(?:ees|es|media|escuelasecundaria)(?:n|no|numero)?0*6(?:\D|$)/.test(compact);
+  if (ees6) return { school: "EES 6", schoolNumber: 6, managementType: "state" };
+  const esn4 = schoolNumber === 4
+    || /\bricardo rojas\b/.test(folded)
+    || /^(?:ees|es|esn|media|secundaria|escuelasecundaria|escueladeeducacionsecundaria)(?:n|no|numero)?0*4(?:\D|$)/.test(compact);
+  if (esn4) return { school: "ESN4", schoolNumber: 4, managementType: "state" };
+  if (schoolNumber === 47 || /408/.test(folded) || /^(?:ees|es|eps)? ?47(?: |$)/.test(folded)) {
+    return { school: "EPS 408 (ES47)", schoolNumber: 47, managementType: "state" };
+  }
+  return { school, schoolNumber, managementType };
+}
+
+function foldSchoolLabel(value: string): string {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR").replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function emptySchoolSummary(school: string, schoolNumber: number | null, managementType: ManagementType): SchoolSummary {
+  const years = Object.fromEntries(Array.from({ length: 7 }, (_, index) => [String(index + 1), { year: index + 1, total: 0, complete: 0, incomplete: 0, completePct: 0 }]));
+  return { school, schoolNumber, managementType, total: 0, complete: 0, incomplete: 0, completePct: 0, roles: { student: { total: 0, complete: 0, incomplete: 0, completePct: 0, years } }, demographics: emptyDemographics() };
+}
+
+function mergeSchoolSummary(target: SchoolSummary, source: SchoolSummary): void {
+  target.total += source.total;
+  target.complete += source.complete;
+  target.incomplete += source.incomplete;
+  target.roles.student.total += source.roles.student.total;
+  target.roles.student.complete += source.roles.student.complete;
+  target.roles.student.incomplete += source.roles.student.incomplete;
+  for (let year = 1; year <= 7; year += 1) {
+    const sourceYear = source.roles.student.years[String(year)];
+    const targetYear = target.roles.student.years[String(year)];
+    if (!sourceYear || !targetYear) continue;
+    targetYear.total += sourceYear.total;
+    targetYear.complete += sourceYear.complete;
+    targetYear.incomplete += sourceYear.incomplete;
+  }
+  target.demographics.validAges += source.demographics.validAges;
+  target.demographics.validGenders += source.demographics.validGenders;
+  for (const group of Object.keys(target.demographics.ageGroups) as Array<keyof typeof target.demographics.ageGroups>) {
+    target.demographics.ageGroups[group] += source.demographics.ageGroups[group] ?? 0;
+  }
+  for (const item of source.demographics.genders) {
+    const existing = target.demographics.genders.find((candidate) => foldSchoolLabel(candidate.label) === foldSchoolLabel(item.label));
+    if (existing) existing.count += item.count;
+    else target.demographics.genders.push({ ...item });
+  }
+}
+
+function finishSchoolSummary(school: SchoolSummary): SchoolSummary {
+  const percentage = (complete: number, total: number) => total ? Math.round(complete / total * 10_000) / 100 : 0;
+  school.completePct = percentage(school.complete, school.total);
+  school.roles.student.completePct = percentage(school.roles.student.complete, school.roles.student.total);
+  for (const year of Object.values(school.roles.student.years)) year.completePct = percentage(year.complete, year.total);
+  school.demographics.genders.sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, "es"));
+  return school;
 }
 
 function selectPanorama(): void {
