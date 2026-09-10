@@ -1,6 +1,6 @@
 import { EES6_NAME, EES4_NAME, EES47_NAME, EPS408_NAME, REVIEW_REQUIRED_NAME, officialStateSchoolName, schoolIdentityKey } from "../../shared/schools";
 import { describe, expect, it, vi } from "vitest";
-import { buildDashboard, detectCompletion, isCoordinateInSanMartin, normalizeGender, normalizeSchool, parseAgeGroup, parseCourseYear, parseSchoolNumber, parseYesNo, splitTimestamp } from "../src/normalize";
+import { buildDashboard, detectCompletion, firstTeacherSchoolMention, isCoordinateInSanMartin, normalizeGender, normalizeSchool, parseAgeGroup, parseCourseYear, parseSchoolNumber, parseYesNo, splitTimestamp } from "../src/normalize";
 import { decodeExport, LimeSurveyClient } from "../src/limesurvey";
 import {
   DASHBOARD_EXPORT_FIELDS,
@@ -90,7 +90,7 @@ describe("normalización", () => {
   });
 
   it("mantiene separadas la EES Nº47 y la Escuela Profesional Secundaria CFP Nº408", () => {
-    for (const variant of ["EES 47", "EES47"]) expect(normalizeSchool(variant)?.original).toBe(EES47_NAME);
+    for (const variant of ["EES 47", "EES47", "Escuela ees Osvaldo valler", "Osvaldo Bayer"]) expect(normalizeSchool(variant)?.original).toBe(EES47_NAME);
     for (const variant of ["EPS 408", "EpS47/408", "EPS 47/408", "EES 47/408", "EES47/408", "EPS", "Eps", "Escuela Profesional Secundaria"]) {
       expect(normalizeSchool(variant)?.original).toBe(EPS408_NAME);
     }
@@ -190,7 +190,7 @@ describe("normalización", () => {
   });
 
   it("unifica todas las variantes inequívocas de Alfonsina y EES 6", () => {
-    for (const variant of ["Alfonsina", "Alfonsina Storni", "Ala alfosina estonir", "ALFoNS¡NA", "E.E.S. N6", "EES6", "ES 6", "Media 6", "Escuela Secundaria N.º 6"]) {
+    for (const variant of ["Alfonsina", "Alfonsina Storni", "Ala alfosina estonir", "ALFoNS¡NA", "E.E.s", "E.E.S.6", "E.E.S. N6", "EES6", "ES 6", "Media 6", "Escuela Secundaria N.º 6"]) {
       expect(normalizeSchool(variant)?.original).toBe(EES6_NAME);
     }
     expect(normalizeSchool("Instituto Alfonsina", "private")?.original).toBe("Instituto Alfonsina");
@@ -198,7 +198,7 @@ describe("normalización", () => {
 
   it("corrige variantes de Alfonsina sin adivinar textos insuficientes", () => {
     expect(normalizeSchool("Alfoncina Storni")?.original).toBe(EES6_NAME);
-    for (const variant of ["E.E.s", "A estudiar", "Hh"]) expect(normalizeSchool(variant)?.original).toBe(variant);
+    for (const variant of ["A estudiar", "Hh"]) expect(normalizeSchool(variant)?.original).toBe(variant);
   });
 
   it("usa ID y respuesta en conjunto y envía las contradicciones a revisión", () => {
@@ -300,6 +300,18 @@ describe("normalización", () => {
       managementType: "state",
       total: 1,
     });
+  });
+
+  it("toma la primera escuela mencionada por docentes", () => {
+    expect(firstTeacherSchoolMention("EES 4 y EES 6")).toBe("EES 4");
+    expect(firstTeacherSchoolMention("EES 47, EPS 408")).toBe("EES 47");
+    const result = buildDashboard([{
+      ROL: "Docente",
+      ESCUELAMAYOR: "EES 47 y EPS 408",
+      submitdate: "2026-09-10",
+    }], "985318", TEACHER_QUESTION_MAP);
+    expect(result.schools).toHaveLength(1);
+    expect(result.schools[0]).toMatchObject({ school: EES47_NAME, schoolNumber: 47 });
   });
 
   it("pide a LimeSurvey únicamente los campos necesarios", async () => {

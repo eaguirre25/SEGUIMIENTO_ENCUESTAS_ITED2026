@@ -150,7 +150,8 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
 } | null {
   const inSanMartin = map.IN_SAN_MARTIN ? parseYesNo(readMappedValue(raw, map.IN_SAN_MARTIN)) : null;
   let managementType = normalizeManagementType(readSemanticValue(raw, map.MANAGEMENT_TYPE, isManagementAnswer));
-  const genericSchoolValue = readSchoolBranch(raw, map);
+  const schoolValueAsReceived = readSchoolBranch(raw, map);
+  const genericSchoolValue = map.ROLE ? firstTeacherSchoolMention(schoolValueAsReceived) : schoolValueAsReceived;
   if (map.SCHOOL_IDENTIFIER && inSanMartin !== false) {
     const resolution = resolveStudentSchool(genericSchoolValue, readMappedValue(raw, map.SCHOOL_IDENTIFIER), managementType);
     const school = normalizeSchool(resolution.identity.school, resolution.identity.managementType);
@@ -408,6 +409,13 @@ export function isExcludedTestResponse(
     ...row,
     managementType: declaredManagement,
   }));
+}
+
+export function firstTeacherSchoolMention(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const clean = value.trim().replace(/\s+/g, " ");
+  if (!clean) return clean;
+  return clean.split(/\s*(?:\r?\n|;|,|\s+\/\s+|\s+-\s+|\s+(?:y|e)\s+)\s*/i).find(Boolean) ?? clean;
 }
 
 function toMonitoringRow(raw: RawResponse, map: QuestionMap, normalized?: NormalizedResponse | null): LoadMonitoringRow {

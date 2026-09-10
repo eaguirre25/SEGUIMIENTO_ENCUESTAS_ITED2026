@@ -3,7 +3,7 @@ export type SchoolManagement = "state" | "private" | "unknown";
 export const EES4_NAME = 'ESCUELA DE EDUCACIÓN SECUNDARIA Nº4 "DR. RICARDO ROJAS"';
 export const EES6_NAME = 'ESCUELA DE EDUCACIÓN SECUNDARIA Nº6 "ALFONSINA STORNI"';
 export const EES24_NAME = "ESCUELA DE EDUCACIÓN SECUNDARIA Nº24";
-export const EES47_NAME = "ESCUELA DE EDUCACIÓN SECUNDARIA Nº47";
+export const EES47_NAME = 'ESCUELA DE EDUCACIÓN SECUNDARIA Nº47 "OSVALDO BAYER"';
 export const EPS408_NAME = "ESCUELA PROFESIONAL SECUNDARIA · CFP Nº408";
 export const REVIEW_REQUIRED_NAME = "Requieren revisión";
 
@@ -52,8 +52,9 @@ export function canonicalSchoolLabel(value: string, managementType: SchoolManage
   if (managementType === "private") return clean;
   if (/\b408\b/.test(folded) || /^eps(?:\d| |$)/.test(folded) || /^cfp(?:\d| |$)/.test(folded)
     || /\b(?:escuela )?(?:profesional secundaria|secundaria profesional)\b/.test(folded)) return EPS408_NAME;
-  if (/\b(?:ala )?(?:alfon[cs]ina|alfosina|alsonfina|alfons na)(?: storni| estonir)?\b/.test(folded)
-    && !/\binstituto\b/.test(folded)) return EES6_NAME;
+  if (/\bosvaldo (?:bayer|valler|baller)\b/.test(folded)) return EES47_NAME;
+  if ((/\b(?:ala )?(?:alfon[cs]ina|alfosina|alsonfina|alfons na)(?: storni| estonir)?\b/.test(folded)
+    && !/\binstituto\b/.test(folded)) || folded === "e e s") return EES6_NAME;
   if (/\bricardo rojas\b/.test(folded)) return EES4_NAME;
   const number = parseSchoolNumber(clean);
   const compact = folded.replace(/\s+/g, "");
