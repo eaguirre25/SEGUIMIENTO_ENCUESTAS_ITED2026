@@ -1,3 +1,4 @@
+import { EES6_NAME, EES4_NAME, EES47_NAME, EPS408_NAME, REVIEW_REQUIRED_NAME, officialStateSchoolName, schoolIdentityKey } from "../../shared/schools";
 import { describe, expect, it, vi } from "vitest";
 import { buildDashboard, detectCompletion, isCoordinateInSanMartin, normalizeGender, normalizeSchool, parseAgeGroup, parseCourseYear, parseSchoolNumber, parseYesNo, splitTimestamp } from "../src/normalize";
 import { decodeExport, LimeSurveyClient } from "../src/limesurvey";
@@ -23,6 +24,12 @@ const map: QuestionMap = {
 };
 
 describe("normalización", () => {
+  it("usa la misma identidad local aunque una población no informe la gestión", () => {
+    expect(schoolIdentityKey({ school: "Colegio Santa Ana", schoolNumber: null, managementType: "private" }))
+      .toBe(schoolIdentityKey({ school: "Colegio Santa Ana", schoolNumber: null, managementType: "unknown" }));
+    expect(schoolIdentityKey({ school: "Colegio Santa Ana", schoolNumber: null, managementType: "private" }))
+      .not.toBe(schoolIdentityKey({ school: "Colegio Santa Ana", schoolNumber: null, managementType: "unknown", inSanMartin: false }));
+  });
   it("separa nombre de escuela y tipo de gestión según la exportación XLSX", () => {
     expect(QUESTION_MAP.SCHOOL).toEqual(["Q996592", "Q996548"]);
     expect(QUESTION_MAP.MANAGEMENT_TYPE).toBe("Q996591");
@@ -53,8 +60,6 @@ describe("normalización", () => {
     expect(FAMILY_QUESTION_MAP.SCHOOL).toEqual(expect.arrayContaining([
       "ESCUELA",
       "997168X472X5756",
-      "ESCUELAFUERA",
-      "997168X472X5802",
     ]));
     expect(FAMILY_QUESTION_MAP.ROLE).toContain("997168X472X5754");
     expect(FAMILY_QUESTION_MAP.ROLE_OTHER).toContain("997168X472X5947");
@@ -71,22 +76,23 @@ describe("normalización", () => {
   });
 
   it("normaliza espacios y mayúsculas sin perder el original limpio", () => {
-    expect(normalizeSchool("  EES   1 ")).toEqual({ original: "EES 1", key: "ees 1" });
-    expect(normalizeSchool("ees 1")?.key).toBe("ees 1");
+    expect(normalizeSchool("  EES   1 ")).toEqual({ original: officialStateSchoolName(1), key: "escuela de educación secundaria no1" });
+    expect(normalizeSchool("ees 1")?.original).toBe(officialStateSchoolName(1));
   });
 
   it("consolida variantes inequívocas de escuelas numeradas", () => {
     for (const variant of [4, "4", "EES4", "EESN 4", "EESN4", "Media 4", "N°4", "Secundaria 4 Ricardo Rojas", "Escuela Número 4 Ricardo Rojas"]) {
-      expect(normalizeSchool(variant)?.original).toBe("EES 4");
+      expect(normalizeSchool(variant)?.original).toBe(EES4_NAME);
     }
-    expect(normalizeSchool("ees26")?.original).toBe("EES 26");
-    expect(normalizeSchool("Ee27")?.original).toBe("EES 27");
+    expect(normalizeSchool("ees26")?.original).toBe(officialStateSchoolName(26));
+    expect(normalizeSchool("Ee27")?.original).toBe(officialStateSchoolName(27));
     expect(normalizeSchool("Santa Ana")?.original).toBe("Santa Ana");
   });
 
-  it("consolida las variantes de la EPS 408 (ES47) (incluyendo EES 47, EES47, EPS, Escuela Secundaria Profesional, etc.)", () => {
-    for (const variant of ["EES 47", "EES47", "EPS 408", "EpS47/408", "EPS 47/408", "EES 47/408", "EES47/408", "EPS", "Eps", "Escuela Profesional Secundaria"]) {
-      expect(normalizeSchool(variant)).toEqual({ original: "EPS 408 (ES47)", key: "eps 408 (es47)" });
+  it("mantiene separadas la EES Nº47 y la Escuela Profesional Secundaria CFP Nº408", () => {
+    for (const variant of ["EES 47", "EES47"]) expect(normalizeSchool(variant)?.original).toBe(EES47_NAME);
+    for (const variant of ["EPS 408", "EpS47/408", "EPS 47/408", "EES 47/408", "EES47/408", "EPS", "Eps", "Escuela Profesional Secundaria"]) {
+      expect(normalizeSchool(variant)?.original).toBe(EPS408_NAME);
     }
     const result = buildDashboard([
       { school: "EES 47", submitdate: "2026-09-04" },
@@ -94,8 +100,9 @@ describe("normalización", () => {
       { school: "EpS47/408", submitdate: null },
       { school: "Escuela Profesional Secundaria...", submitdate: "2026-09-04" },
     ], "test", map);
-    expect(result.schools).toHaveLength(1);
-    expect(result.schools[0]).toMatchObject({ school: "EPS 408 (ES47)", total: 4, complete: 3, incomplete: 1 });
+    expect(result.schools).toHaveLength(2);
+    expect(result.schools.find((school) => school.school === EES47_NAME)).toMatchObject({ total: 1, complete: 1 });
+    expect(result.schools.find((school) => school.school === EPS408_NAME)).toMatchObject({ total: 3, complete: 2, incomplete: 1 });
   });
 
   it("recupera el único número escolar válido del texto estatal", () => {
@@ -127,7 +134,7 @@ describe("normalización", () => {
       validGenders: 3,
       genders: [{ label: "Mujer", count: 2 }, { label: "Varón", count: 1 }],
     });
-    expect(result.schools.find((school) => school.school === "EES 4")?.demographics.validAges).toBe(2);
+    expect(result.schools.find((school) => school.school === EES4_NAME)?.demographics.validAges).toBe(2);
     expect(result.monitoringRows[0]).not.toHaveProperty("age");
     expect(result.monitoringRows[0]).not.toHaveProperty("gender");
   });
@@ -146,7 +153,7 @@ describe("normalización", () => {
       { management: "Privada", private_school: "Santa Ana", submitdate: "2026-08-13" },
     ], "977929", surveyMap);
     expect(result.schools).toMatchObject([
-      { school: "EES 4", schoolNumber: 4, total: 2 },
+      { school: EES4_NAME, schoolNumber: 4, total: 2 },
       { school: "Santa Ana", schoolNumber: null, total: 1 },
     ]);
   });
@@ -168,33 +175,78 @@ describe("normalización", () => {
     ], "977929", surveyMap);
 
     expect(result.summary).toMatchObject({ total: 4, complete: 3, incomplete: 1 });
-    expect(result.schools).toHaveLength(1);
-    expect(result.schools[0]).toMatchObject({
-      school: "EES 6",
+    expect(result.schools).toHaveLength(2);
+    expect(result.schools.find((school) => school.school === EES6_NAME)).toMatchObject({
+      school: EES6_NAME,
       schoolNumber: 6,
       managementType: "state",
-      total: 4,
+      total: 3,
       complete: 3,
-      incomplete: 1,
+      incomplete: 0,
     });
+    expect(result.schools.find((school) => school.school === REVIEW_REQUIRED_NAME)).toMatchObject({ total: 1, incomplete: 1 });
+    expect(result.monitoringRows.find((row) => row.schoolIdentifier === "99")).toMatchObject({ resolvedSchool: REVIEW_REQUIRED_NAME, classificationMethod: "requires_review", reviewReason: "conflict" });
     expect(result.monitoringRows.filter((row) => row.school === "Alfonsina Storni")).toHaveLength(3);
   });
 
   it("unifica todas las variantes inequívocas de Alfonsina y EES 6", () => {
-    for (const variant of ["Alfonsina", "Alfonsina Storni", "Instituto Alfonsina", "E.E.S. N6", "EES6", "ES 6", "Media 6", "Escuela Secundaria N.º 6"]) {
-      expect(normalizeSchool(variant)?.original).toBe("EES 6");
+    for (const variant of ["Alfonsina", "Alfonsina Storni", "Ala alfosina estonir", "ALFoNS¡NA", "E.E.S. N6", "EES6", "ES 6", "Media 6", "Escuela Secundaria N.º 6"]) {
+      expect(normalizeSchool(variant)?.original).toBe(EES6_NAME);
     }
+    expect(normalizeSchool("Instituto Alfonsina", "private")?.original).toBe("Instituto Alfonsina");
   });
 
-  it("aplica las equivalencias específicas indicadas para EES 6", () => {
-    for (const variant of ["Alfoncina Storni", "E.E.s", "A estudiar", "Hh"]) {
-      expect(normalizeSchool(variant)?.original).toBe("EES 6");
-    }
+  it("corrige variantes de Alfonsina sin adivinar textos insuficientes", () => {
+    expect(normalizeSchool("Alfoncina Storni")?.original).toBe(EES6_NAME);
+    for (const variant of ["E.E.s", "A estudiar", "Hh"]) expect(normalizeSchool(variant)?.original).toBe(variant);
+  });
+
+  it("usa ID y respuesta en conjunto y envía las contradicciones a revisión", () => {
+    const studentMap: QuestionMap = { ...map, SCHOOL_IDENTIFIER: "school_identifier", MANAGEMENT_TYPE: "management" };
+    const result = buildDashboard([
+      { school: "Alfoncina", school_identifier: "S6", management: "Estatal", startdate: "2026-09-08 09:00:00" },
+      { school: "Alfonsina", school_identifier: "S24", management: "Estatal", startdate: "2026-09-08 09:01:00" },
+      { school: "", school_identifier: "", management: "Estatal", startdate: "2026-09-09 09:00:00" },
+    ], "977929", studentMap, undefined, new Set());
+
+    expect(result.schools.find((school) => school.school === EES6_NAME)).toMatchObject({ total: 1 });
+    expect(result.schools.find((school) => school.school === REVIEW_REQUIRED_NAME)).toMatchObject({ total: 2 });
+    expect(result.monitoringRows.find((row) => row.schoolIdentifier === "S24")).toMatchObject({ reviewReason: "conflict" });
+  });
+
+  it("infiere sólo faltantes dentro de una franja inequívoca", () => {
+    const studentMap: QuestionMap = { ...map, SCHOOL_IDENTIFIER: "school_identifier", MANAGEMENT_TYPE: "management" };
+    const result = buildDashboard([
+      { school: "EES 24", school_identifier: "S24", management: "Estatal", startdate: "2026-09-07 09:00:00" },
+      { school: "Secundaria 24", school_identifier: "24", management: "Estatal", startdate: "2026-09-07 09:20:00" },
+      { school: "", school_identifier: "", management: "Estatal", startdate: "2026-09-07 09:10:00" },
+    ], "977929", studentMap, undefined, new Set());
+
+    expect(result.schools).toHaveLength(1);
+    expect(result.schools[0]).toMatchObject({ school: officialStateSchoolName(24), total: 3 });
+    expect(result.monitoringRows.find((row) => row.time === "09:10:00")).toMatchObject({
+      resolvedSchool: officialStateSchoolName(24),
+      classificationMethod: "time_window",
+    });
+  });
+
+  it("no infiere durante la superposición entre la EES Nº24 y la EES Nº47", () => {
+    const studentMap: QuestionMap = { ...map, SCHOOL_IDENTIFIER: "school_identifier", MANAGEMENT_TYPE: "management" };
+    const rows = [
+      ...[0, 10, 20, 30].map((minute) => ({ school: "EES 24", school_identifier: "S24", management: "Estatal", startdate: `2026-09-10 10:${String(minute).padStart(2, "0")}:00` })),
+      { school: "EES 47", school_identifier: "S47", management: "Estatal", startdate: "2026-09-10 10:15:00" },
+      { school: "", school_identifier: "", management: "Estatal", startdate: "2026-09-10 10:18:00" },
+    ];
+    const result = buildDashboard(rows, "977929", studentMap, undefined, new Set());
+    expect(result.monitoringRows.find((row) => row.time === "10:18:00")).toMatchObject({
+      resolvedSchool: REVIEW_REQUIRED_NAME,
+      classificationMethod: "requires_review",
+    });
   });
 
   it("unifica las variantes de la Secundaria 4 bajo EES 4", () => {
     for (const variant of ["EES 4", "EES4", "E.E.S.4", "E.E.S. N.º 4", "Secundaria 4", "Escuela de Educación Secundaria N°4 Dr. Ricardo Rojas", "Ricardo Rojas"]) {
-      expect(normalizeSchool(variant)?.original).toBe("EES 4");
+      expect(normalizeSchool(variant)?.original).toBe(EES4_NAME);
     }
   });
 
@@ -211,7 +263,7 @@ describe("normalización", () => {
       "977929",
       branchedMap,
     );
-    expect(result.schools[0].school).toBe("EES 26");
+    expect(result.schools[0].school).toBe(officialStateSchoolName(26));
   });
 
   it("detecta respuestas completas e incompletas", () => {
@@ -243,7 +295,7 @@ describe("normalización", () => {
       { teacher_school: "33", submitdate: null },
     ], "985318", teacherMap);
     expect(result.schools[0]).toMatchObject({
-      school: "EES 33",
+      school: officialStateSchoolName(33),
       schoolNumber: 33,
       managementType: "state",
       total: 1,
@@ -314,7 +366,7 @@ describe("agregación segura", () => {
       map,
     );
     expect(canonical.schools).toHaveLength(1);
-    expect(canonical.schools[0]).toMatchObject({ school: "EES 1", total: 2 });
+    expect(canonical.schools[0]).toMatchObject({ school: officialStateSchoolName(1), total: 2 });
   });
 
   it("mantiene completas + incompletas = total", () => {
@@ -336,9 +388,9 @@ describe("agregación segura", () => {
       { school: "Media 1", school_identifier: "ID-001", year: "1.º año", management: "Estatal", startdate: "2026-08-14 08:05:00", submitdate: null },
       { school: "  Colegio del Parque  ", school_identifier: "  PRIV-09  ", year: "3", management: "Privada", startdate: "2026-08-14 09:15:30", submitdate: "2026-08-14 09:20:00" },
     ], "977929", monitoringMap);
-    expect(monitored.monitoringRows).toEqual([
-      { date: "2026-08-14", time: "09:15:30", school: "  Colegio del Parque  ", schoolIdentifier: "  PRIV-09  ", role: "Sin informar", managementType: "private", courseYear: 3, inSanMartin: null, complete: true },
-      { date: "2026-08-14", time: "08:05:00", school: "Media 1", schoolIdentifier: "ID-001", role: "Sin informar", managementType: "state", courseYear: 1, inSanMartin: null, complete: false },
+    expect(monitored.monitoringRows).toMatchObject([
+      { date: "2026-08-14", time: "09:15:30", school: "  Colegio del Parque  ", resolvedSchool: "Colegio del Parque", classificationMethod: "name_only", managementType: "private", complete: true },
+      { date: "2026-08-14", time: "08:05:00", school: "Media 1", resolvedSchool: officialStateSchoolName(1), classificationMethod: "id_and_name", managementType: "state", complete: false },
     ]);
     expect(monitored.monitoringRows).toHaveLength(monitored.summary.total);
   });
@@ -357,6 +409,8 @@ describe("agregación segura", () => {
       role: "Director/a",
       school: "EESN 4",
       schoolIdentifier: "Sin informar",
+      resolvedSchool: EES4_NAME,
+      classificationMethod: "direct",
       managementType: "state",
       courseYear: null,
       inSanMartin: null,
@@ -429,7 +483,7 @@ describe("agregación segura", () => {
 
     expect(result.schools).toHaveLength(1);
     expect(result.schools[0]).toMatchObject({
-      school: "EES 13",
+      school: officialStateSchoolName(13),
       schoolNumber: 13,
       managementType: "state",
       total: 1,
@@ -440,6 +494,8 @@ describe("agregación segura", () => {
       role: "Madre",
       school: "Escuela 13",
       schoolIdentifier: "Sin informar",
+      resolvedSchool: officialStateSchoolName(13),
+      classificationMethod: "direct",
       managementType: "state",
       courseYear: 3,
       inSanMartin: true,
@@ -501,7 +557,7 @@ describe("agregación segura", () => {
     expect(withMissingSchool.summary).toMatchObject({ total: 1, complete: 0, incomplete: 1 });
     expect(withMissingSchool.schools).toEqual([]);
     expect(withMissingSchool.mapPoints).toEqual([{
-      school: "Sin escuela identificada",
+      school: REVIEW_REQUIRED_NAME,
       schoolNumber: null,
       managementType: "unknown",
       complete: false,

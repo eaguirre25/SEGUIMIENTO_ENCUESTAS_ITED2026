@@ -11,6 +11,7 @@ import {
 import type { Env } from "./types";
 
 const DASHBOARD_TIME_ZONE = "America/Argentina/Buenos_Aires";
+const DASHBOARD_MAX_CACHE_AGE_MS = 5 * 60_000;
 type DashboardPopulation = "students" | "teachers" | "families";
 
 export default {
@@ -47,13 +48,24 @@ export default {
       const refreshPaused = isDashboardRefreshPaused(Date.now());
       if (!forceRefresh || refreshPaused) {
         const cached = await readCachedDashboard(env, population, config.surveyId);
-        if (cached) return jsonText(cached, 200, cors, refreshPaused ? "D1-PAUSED" : "D1");
+        if (cached && (refreshPaused || !isDashboardCacheStale(cached.generatedAt, Date.now()))) {
+          return dashboardJson(cached.payload, 200, cors, refreshPaused ? "D1-PAUSED" : "D1", cached.generatedAt);
+        }
+        if (cached && !refreshPaused) {
+          try {
+            const fresh = await refreshDashboard(env, population);
+            return dashboardJson(fresh, 200, cors, "STALE-REFRESH");
+          } catch (error) {
+            console.error(JSON.stringify({ message: "stale dashboard refresh failed", population, error: errorMessage(error) }));
+            return dashboardJson(cached.payload, 200, cors, "D1-STALE", cached.generatedAt, true);
+          }
+        }
         if (refreshPaused) {
           return jsonError("La actualización está pausada fuera del horario operativo", 503, cors);
         }
       }
       const fresh = await refreshDashboard(env, population);
-      return jsonText(fresh, 200, cors, forceRefresh ? "REFRESH" : "SEED");
+      return dashboardJson(fresh, 200, cors, forceRefresh ? "REFRESH" : "SEED");
     } catch (error) {
       console.error(JSON.stringify({ message: "dashboard request failed", error: errorMessage(error) }));
       const message = error instanceof Error ? error.message : "Error inesperado";
@@ -91,18 +103,25 @@ export function isDashboardRefreshPaused(timestamp: number): boolean {
   return weekend || hour >= 23 || hour < 8;
 }
 
+export function isDashboardCacheStale(generatedAt: string, now = Date.now()): boolean {
+  const generated = Date.parse(generatedAt);
+  return !Number.isFinite(generated) || now - generated > DASHBOARD_MAX_CACHE_AGE_MS;
+}
+
 async function readCachedDashboard(
   env: Env,
   population: DashboardPopulation,
   expectedSurveyId: string,
-): Promise<string | null> {
+): Promise<{ payload: string; generatedAt: string } | null> {
   const row = await env.DASHBOARD_DB.prepare(
     "SELECT payload FROM dashboard_population_cache WHERE population = ?1",
   ).bind(population).first<{ payload: string }>();
   if (!row?.payload) return null;
   try {
-    const cached = JSON.parse(row.payload) as { surveyId?: unknown };
-    return cached.surveyId === expectedSurveyId ? row.payload : null;
+    const cached = JSON.parse(row.payload) as { surveyId?: unknown; generatedAt?: unknown };
+    return cached.surveyId === expectedSurveyId && typeof cached.generatedAt === "string"
+      ? { payload: row.payload, generatedAt: cached.generatedAt }
+      : null;
   } catch {
     return null;
   }
@@ -198,6 +217,7 @@ function corsHeaders(origin: string | null, allowed: string): Headers | undefine
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Accept, Authorization, Cache-Control, Content-Type, Pragma",
+    "Access-Control-Expose-Headers": "X-Dashboard-Cache, X-Dashboard-Generated-At, X-Dashboard-Stale",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   });
@@ -221,6 +241,27 @@ function jsonText(payload: string, status: number, cors?: Headers, cache = "BYPA
   headers.set("cache-control", "private, no-store");
   headers.set("X-Dashboard-Cache", cache);
   return new Response(payload, { status, headers });
+}
+
+function dashboardJson(
+  payload: string,
+  status: number,
+  cors: Headers | undefined,
+  cache: string,
+  generatedAt?: string,
+  stale = false,
+): Response {
+  const headers = cors ?? new Headers();
+  let timestamp = generatedAt;
+  if (!timestamp) {
+    try {
+      const parsed = JSON.parse(payload) as { generatedAt?: unknown };
+      if (typeof parsed.generatedAt === "string") timestamp = parsed.generatedAt;
+    } catch { /* el contrato se valida en el frontend */ }
+  }
+  if (timestamp) headers.set("X-Dashboard-Generated-At", timestamp);
+  if (stale) headers.set("X-Dashboard-Stale", "true");
+  return jsonText(payload, status, headers, cache);
 }
 
 function jsonError(message: string, status: number, cors?: Headers): Response {

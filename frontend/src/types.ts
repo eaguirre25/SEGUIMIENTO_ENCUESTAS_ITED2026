@@ -16,6 +16,7 @@ export interface DemographicSummary {
 
 export interface YearCounts extends Counts { year: number }
 export interface SchoolSummary extends Counts {
+  inSanMartin?: boolean | null;
   school: string;
   schoolNumber: number | null;
   managementType: ManagementType;
@@ -42,6 +43,9 @@ export interface DashboardPayload {
     time: string;
     school: string;
     schoolIdentifier: string;
+    resolvedSchool: string;
+    classificationMethod: "direct" | "id_and_name" | "name_only" | "id_only" | "time_window" | "requires_review";
+    reviewReason?: "conflict" | "insufficient";
     role: string;
     managementType: ManagementType;
     courseYear: number | null;

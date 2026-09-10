@@ -2,7 +2,7 @@ name: Desplegar Cloudflare Worker
 on:
   push:
     branches: [main]
-    paths: ["worker/**", "package-lock.json", ".github/workflows/deploy-worker.yml"]
+    paths: ["shared/**", "worker/**", "package-lock.json", ".github/workflows/deploy-worker.yml"]
   workflow_dispatch:
 jobs:
   deploy:

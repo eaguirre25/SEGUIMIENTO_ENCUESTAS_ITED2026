@@ -1,10 +1,12 @@
+import { canonicalizePayload } from "./payload";
+import { formatDataAge, isDataStale } from "./freshness";
+import { loadPopulationTarget, savePopulationTarget } from "./targets";
+import { officialSchoolId, officialSchoolName, schoolLocation, type SchoolLocation } from "./school-catalog";
 import type { GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent, Marker as MapLibreMarker } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./style.css";
 import "./panorama.css";
 import demoData from "./data/demo.json";
-import stateSchoolsData from "./data/state-schools.json";
-import privateSchoolsData from "./data/private-schools.json";
 import unsamLogoUrl from "./assets/unsam_logo_3d.png";
 import type { DashboardPayload, ManagementType, SchoolSummary } from "./types";
 import { renderPanoramaGeneral } from "./panorama";
@@ -37,33 +39,10 @@ let showThreads = true;
 let filtersInitialized = false;
 const selectedSchoolIds = new Set<string>();
 
-interface StateSchool {
-  id: string;
-  schoolNumber: number;
-  managementType: "state";
-  name: string;
-  cue: string;
-  locality: string;
-  address: string;
-  coordinates: [number, number];
-}
-
-interface PrivateSchool {
-  id: string;
-  schoolNumber: null;
-  managementType: "private";
-  name: string;
-  cue: string;
-  locality: string;
-  address: string;
-  coordinates: [number, number];
-}
-
-type SchoolLocation = StateSchool | PrivateSchool;
 type Population = "students" | "teachers" | "families";
 type DashboardView = "tracking" | "map" | "monitoring";
 type MonitoringRow = DashboardPayload["monitoringRows"][number];
-type MonitoringSortKey = "date" | "time" | "school" | "schoolIdentifier" | "role" | "managementType" | "courseYear" | "inSanMartin" | "complete";
+type MonitoringSortKey = "date" | "time" | "school" | "schoolIdentifier" | "resolvedSchool" | "role" | "managementType" | "courseYear" | "inSanMartin" | "complete";
 
 const POPULATION_LABELS: Record<Population, string> = {
   students: "ESTUDIANTES",
@@ -84,28 +63,6 @@ interface ResolvedMapPoint {
 }
 
 class AuthenticationError extends Error {}
-
-const STATE_SCHOOLS: StateSchool[] = stateSchoolsData.features.map((feature) => ({
-  id: `state:${feature.properties.schoolNumber}`,
-  schoolNumber: feature.properties.schoolNumber,
-  managementType: "state",
-  name: feature.properties.name,
-  cue: feature.properties.cue,
-  locality: feature.properties.locality,
-  address: feature.properties.address,
-  coordinates: [feature.geometry.coordinates[0], feature.geometry.coordinates[1]],
-}));
-
-const PRIVATE_SCHOOLS: PrivateSchool[] = privateSchoolsData.features.map((feature) => ({
-  id: feature.properties.schoolId,
-  schoolNumber: null,
-  managementType: "private",
-  name: feature.properties.name,
-  cue: feature.properties.cue,
-  locality: feature.properties.locality,
-  address: feature.properties.address,
-  coordinates: [feature.geometry.coordinates[0], feature.geometry.coordinates[1]],
-}));
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("No se encontró #app");
@@ -351,94 +308,6 @@ function emptyDemographics(): DashboardPayload["demographics"] {
   };
 }
 
-function canonicalizePayload(payload: DashboardPayload): DashboardPayload {
-  const schools = new Map<string, SchoolSummary>();
-  for (const source of payload.schools) {
-    const identity = canonicalSchoolIdentity(source.school, source.schoolNumber, source.managementType);
-    const key = `${identity.managementType}:${identity.schoolNumber ?? foldSchoolLabel(identity.school)}`;
-    const current = schools.get(key) ?? emptySchoolSummary(identity.school, identity.schoolNumber, identity.managementType);
-    mergeSchoolSummary(current, source);
-    schools.set(key, current);
-  }
-  return {
-    ...payload,
-    schools: [...schools.values()]
-      .map(finishSchoolSummary)
-      .sort((left, right) => right.total - left.total || left.school.localeCompare(right.school, "es")),
-    mapPoints: payload.mapPoints.map((point) => ({
-      ...point,
-      ...canonicalSchoolIdentity(point.school, point.schoolNumber, point.managementType),
-    })),
-    monitoringRows: payload.monitoringRows.map((row) => {
-      const identity = canonicalSchoolIdentity(row.school, null, row.managementType);
-      return { ...row, school: identity.school, managementType: identity.managementType };
-    }),
-  };
-}
-
-function canonicalSchoolIdentity(school: string, schoolNumber: number | null, managementType: ManagementType): Pick<SchoolSummary, "school" | "schoolNumber" | "managementType"> {
-  const folded = foldSchoolLabel(school);
-  const compact = folded.replace(/\s+/g, "");
-  const ees6 = schoolNumber === 6
-    || /\balfon[cs]ina\b/.test(folded)
-    || ["e e s", "a estudiar", "hh"].includes(folded)
-    || /^(?:ees|es|media|escuelasecundaria)(?:n|no|numero)?0*6(?:\D|$)/.test(compact);
-  if (ees6) return { school: "EES 6", schoolNumber: 6, managementType: "state" };
-  const ees4 = schoolNumber === 4
-    || /\bricardo rojas\b/.test(folded)
-    || /^(?:ees|es|esn|media|secundaria|escuelasecundaria|escueladeeducacionsecundaria)(?:n|no|numero)?0*4(?:\D|$)/.test(compact);
-  if (ees4) return { school: "EES 4", schoolNumber: 4, managementType: "state" };
-  if (schoolNumber === 47 || /408/.test(folded) || /^(?:ees|es|eps)? ?47(?: |$)/.test(folded)) {
-    return { school: "EPS 408 (ES47)", schoolNumber: 47, managementType: "state" };
-  }
-  return { school, schoolNumber, managementType };
-}
-
-function foldSchoolLabel(value: string): string {
-  return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR").replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function emptySchoolSummary(school: string, schoolNumber: number | null, managementType: ManagementType): SchoolSummary {
-  const years = Object.fromEntries(Array.from({ length: 7 }, (_, index) => [String(index + 1), { year: index + 1, total: 0, complete: 0, incomplete: 0, completePct: 0 }]));
-  return { school, schoolNumber, managementType, total: 0, complete: 0, incomplete: 0, completePct: 0, roles: { student: { total: 0, complete: 0, incomplete: 0, completePct: 0, years } }, demographics: emptyDemographics() };
-}
-
-function mergeSchoolSummary(target: SchoolSummary, source: SchoolSummary): void {
-  target.total += source.total;
-  target.complete += source.complete;
-  target.incomplete += source.incomplete;
-  target.roles.student.total += source.roles.student.total;
-  target.roles.student.complete += source.roles.student.complete;
-  target.roles.student.incomplete += source.roles.student.incomplete;
-  for (let year = 1; year <= 7; year += 1) {
-    const sourceYear = source.roles.student.years[String(year)];
-    const targetYear = target.roles.student.years[String(year)];
-    if (!sourceYear || !targetYear) continue;
-    targetYear.total += sourceYear.total;
-    targetYear.complete += sourceYear.complete;
-    targetYear.incomplete += sourceYear.incomplete;
-  }
-  target.demographics.validAges += source.demographics.validAges;
-  target.demographics.validGenders += source.demographics.validGenders;
-  for (const group of Object.keys(target.demographics.ageGroups) as Array<keyof typeof target.demographics.ageGroups>) {
-    target.demographics.ageGroups[group] += source.demographics.ageGroups[group] ?? 0;
-  }
-  for (const item of source.demographics.genders) {
-    const existing = target.demographics.genders.find((candidate) => foldSchoolLabel(candidate.label) === foldSchoolLabel(item.label));
-    if (existing) existing.count += item.count;
-    else target.demographics.genders.push({ ...item });
-  }
-}
-
-function finishSchoolSummary(school: SchoolSummary): SchoolSummary {
-  const percentage = (complete: number, total: number) => total ? Math.round(complete / total * 10_000) / 100 : 0;
-  school.completePct = percentage(school.complete, school.total);
-  school.roles.student.completePct = percentage(school.roles.student.complete, school.roles.student.total);
-  for (const year of Object.values(school.roles.student.years)) year.completePct = percentage(year.complete, year.total);
-  school.demographics.genders.sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, "es"));
-  return school;
-}
-
 function selectPanorama(): void {
   if (activeSection === "panorama") return;
   activeSection = "panorama";
@@ -501,12 +370,12 @@ function render(): void {
     return;
   }
   initializeFilters();
-  const target = loadTarget();
+  const target = loadPopulationTarget(localStorage, activePopulation);
   const progress = Math.min((data.summary.total / target) * 100, 100);
   const tracking = document.querySelector<HTMLElement>("#tracking-view");
   if (!tracking) return;
   tracking.innerHTML = `
-    <div id="warning-slot">${warningMarkup()}</div>
+    <div id="warning-slot">${warningMarkup()}${freshnessWarningMarkup(data)}</div>
     <section class="hero-grid">
       <article class="vessel-card panel">
         <div class="section-heading"><div><p class="eyebrow">AVANCE DE CAMPO</p><h2>Recipiente de respuestas</h2></div><span class="live-badge">EN CURSO</span></div>
@@ -516,7 +385,7 @@ function render(): void {
             <p class="big-progress"><strong>${formatNumber(data.summary.total)}</strong><span>/ ${formatNumber(target)}</span></p>
             <p class="progress-pct">${formatPct((data.summary.total / target) * 100)}</p>
             <p class="muted">respuestas capturadas · incluye completas e incompletas</p>
-            <label for="target">Cantidad deseada de encuestas</label>
+            <label for="target">Meta de ${POPULATION_LABELS[activePopulation].toLocaleLowerCase("es-AR")}</label>
             <div class="target-control"><input id="target" type="number" min="1" step="50" value="${target}"><button id="save-target">Aplicar</button></div>
           </div>
         </div>
@@ -527,7 +396,7 @@ function render(): void {
         ${metric("Incompletas", data.summary.incomplete, "orange", "◒")}
         ${metric("Completitud", formatPct(data.summary.completePct), "cyan", "≈")}
         ${metric("Escuelas con encuestas aplicadas", data.schools.length, "pink", "⌂")}
-        ${metric("Datos de LimeSurvey", formatDateTime(data.generatedAt), "blue", "◷")}
+        ${metric(isDataStale(data.generatedAt) ? "Último corte · desactualizado" : "Corte de LimeSurvey", formatDateTime(data.generatedAt), "blue", "◷")}
       </section>
     </section>
     <section class="schools-panel panel">
@@ -623,10 +492,10 @@ function renderMonitoring(): void {
   const teacherGrid = activePopulation === "teachers";
   const familyGrid = activePopulation === "families";
   const headers = teacherGrid
-    ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Rol", "role")}${sortHeader("Escuela con mayor carga horaria", "school")}${sortHeader("Encuesta completa o incompleta", "complete")}`
+    ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Rol", "role")}${sortHeader("Escuela con mayor carga horaria", "resolvedSchool")}${sortHeader("Encuesta completa o incompleta", "complete")}`
     : familyGrid
-      ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Vínculo", "role")}${sortHeader("Escuela", "school")}${sortHeader("General San Martín", "inSanMartin")}${sortHeader("Año", "courseYear")}${sortHeader("Encuesta completa", "complete")}`
-    : `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("¿A qué escuela vas?", "school")}${sortHeader("ID escuela", "schoolIdentifier")}${sortHeader("Gestión", "managementType")}${sortHeader("Año de secundaria", "courseYear")}${sortHeader("Encuesta completa", "complete")}`;
+      ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Vínculo", "role")}${sortHeader("Escuela oficial", "resolvedSchool")}${sortHeader("General San Martín", "inSanMartin")}${sortHeader("Año", "courseYear")}${sortHeader("Encuesta completa", "complete")}`
+    : `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Escuela asignada", "resolvedSchool")}${sortHeader("Respuesta recibida", "school")}${sortHeader("ID escuela", "schoolIdentifier")}${sortHeader("Gestión", "managementType")}${sortHeader("Año", "courseYear")}${sortHeader("Encuesta completa", "complete")}`;
   view.innerHTML = `
     <section class="monitoring-panel panel">
       <div class="monitoring-heading section-heading">
@@ -636,14 +505,14 @@ function renderMonitoring(): void {
       ${rows.length ? `<div class="monitoring-table-wrap"><table class="monitoring-table">
         <thead><tr>${headers}</tr></thead>
         <tbody>${rows.map((row) => teacherGrid ? `<tr>
-          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.role || "Sin informar")}</td><td>${escapeHtml(row.school)}</td>
+          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.role || "Sin informar")}</td><td>${escapeHtml(monitoringResolvedName(row))}</td>
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "COMPLETA" : "INCOMPLETA"}</span></td>
         </tr>` : familyGrid ? `<tr>
-          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.role || "Sin informar")}</td><td>${escapeHtml(row.school)}</td>
+          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.role || "Sin informar")}</td><td>${escapeHtml(monitoringResolvedName(row))}</td>
           <td>${row.inSanMartin === null ? "Sin informar" : row.inSanMartin ? "Sí" : "No"}</td><td>${row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`}</td>
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "SI" : "NO"}</span></td>
         </tr>` : `<tr>
-          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.school)}</td><td>${escapeHtml(row.schoolIdentifier)}</td>
+          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td><strong>${escapeHtml(monitoringResolvedName(row))}</strong>${row.classificationMethod === "time_window" ? "<small>Inferida por fecha y horario</small>" : row.classificationMethod === "requires_review" ? `<small>${row.reviewReason === "conflict" ? "ID y respuesta contradictorios" : "Sin datos suficientes"}</small>` : ""}</td><td>${escapeHtml(row.school)}</td><td>${escapeHtml(row.schoolIdentifier)}</td>
           <td><span class="management-badge ${row.managementType}">${managementLabel(row.managementType)}</span></td><td>${row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`}</td>
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "SI" : "NO"}</span></td>
         </tr>`).join("")}</tbody>
@@ -762,7 +631,7 @@ function updateSchoolMarkers(): void {
     element.type = "button";
     element.className = `school-map-marker ${school.managementType} active`;
     element.style.setProperty("--school-color", color);
-    element.title = `${school.name} · ${summary.total} respuestas`;
+    element.title = `${schoolDisplayName(summary)} · ${summary.total} respuestas`;
     element.setAttribute("aria-label", element.title);
     const glyph = document.createElement("i");
     glyph.className = "marker-glyph";
@@ -772,13 +641,15 @@ function updateSchoolMarkers(): void {
     element.append(badge);
     const popup = new maplibreModule.Popup({ offset: 32, closeButton: false }).setHTML(`
       <div class="school-popup">
-        <p>${school.managementType === "state" ? `EES ${school.schoolNumber} · GESTIÓN ESTATAL` : "GESTIÓN PRIVADA"} · CUE ${escapeHtml(school.cue)}</p>
+        <p>${school.managementType === "state" ? "GESTIÓN ESTATAL" : "GESTIÓN PRIVADA"}${school.cue ? ` · CUE ${escapeHtml(school.cue)}` : ""}</p>
         <h3>${escapeHtml(school.name)}</h3>
         <span>${escapeHtml(school.address)} · ${escapeHtml(school.locality)}</span>
         <strong>${summary.total} respuestas · ${summary.complete} completas · ${summary.incomplete} incompletas</strong>
       </div>
     `);
-    schoolMarkers.push(new maplibreModule.Marker({ element, anchor: "bottom" })
+    const sharedBuildingOffset: [number, number] = school.id === "state:47" ? [-12, 0]
+      : school.id === "state:eps-408" ? [12, 0] : [0, 0];
+    schoolMarkers.push(new maplibreModule.Marker({ element, anchor: "bottom", offset: sharedBuildingOffset })
       .setLngLat(school.coordinates)
       .setPopup(popup)
       .addTo(map));
@@ -817,8 +688,8 @@ function renderLegend(): void {
         const id = schoolIdForSummary(school);
         return `<label class="school-filter"><input type="checkbox" data-school-id="${id}" ${selectedSchoolIds.has(id) ? "checked" : ""}><i style="--school-color:${colorFor(id)}"></i><span>${escapeHtml(schoolDisplayName(school))}</span><b>${school.total}</b></label>`;
       }).join("") || `<p class="legend-empty">Sin respuestas identificadas.</p>`}</div></section>`;
-  }).join("") + (resolvedMapPoints().some((point) => point.managementType === "unknown")
-    ? `<label class="school-filter unknown-filter"><input type="checkbox" data-school-id="unknown" ${selectedSchoolIds.has("unknown") ? "checked" : ""}><i></i><span>Matrícula sin escuela identificada</span></label>` : "");
+  }).join("") + (resolvedMapPoints().some((point) => point.schoolId === "review-required")
+    ? `<label class="school-filter unknown-filter"><input type="checkbox" data-school-id="review-required" ${selectedSchoolIds.has("review-required") ? "checked" : ""}><i></i><span>Requieren revisión</span></label>` : "");
   legend.querySelectorAll<HTMLInputElement>("[data-school-id]").forEach((input) => input.addEventListener("change", () => {
     const id = input.dataset.schoolId;
     if (id) input.checked ? selectedSchoolIds.add(id) : selectedSchoolIds.delete(id);
@@ -835,41 +706,24 @@ function renderLegend(): void {
 function initializeFilters(): void {
   if (filtersInitialized || !data) return;
   data.schools.map(schoolIdForSummary).forEach((id) => selectedSchoolIds.add(id));
-  if (data.mapPoints.some((point) => point.managementType === "unknown")) selectedSchoolIds.add("unknown");
+  if (data.mapPoints.some((point) => point.school === "Requieren revisión")) selectedSchoolIds.add("review-required");
   filtersInitialized = true;
 }
 
 function schoolDisplayName(school: SchoolSummary): string {
-  if (school.schoolNumber === 6 || /\balfonsina\b/i.test(school.school)) return "EES 6";
-  if (school.schoolNumber === 47 || school.school.includes("408") || privateSchoolKey(school.school) === "eps 408 es47") return "EPS 408 (ES47)";
-  return schoolLocationForSummary(school)?.name ?? school.school;
+  return officialSchoolName(school);
+}
+
+function monitoringResolvedName(row: MonitoringRow): string {
+  return officialSchoolName({ school: row.resolvedSchool, schoolNumber: null, managementType: row.managementType, inSanMartin: row.inSanMartin });
 }
 
 function schoolLocationForSummary(school: SchoolSummary): SchoolLocation | null {
-  if (school.schoolNumber === 6 || /\balfonsina\b/i.test(school.school)) {
-    return STATE_SCHOOLS.find((candidate) => candidate.schoolNumber === 6) ?? null;
-  }
-  if (school.schoolNumber === 47 || school.school.includes("408")) {
-    return STATE_SCHOOLS.find((candidate) => candidate.schoolNumber === 47) ?? null;
-  }
-  if (school.managementType === "state" && school.schoolNumber !== null) {
-    return STATE_SCHOOLS.find((candidate) => candidate.schoolNumber === school.schoolNumber) ?? null;
-  }
-  if (school.managementType === "private") {
-    const key = privateSchoolKey(school.school);
-    const matches = PRIVATE_SCHOOLS.filter((candidate) => privateSchoolKey(candidate.name) === key);
-    return matches.length === 1 ? matches[0] : null;
-  }
-  return null;
+  return schoolLocation(school);
 }
 
 function schoolIdForSummary(school: SchoolSummary): string {
-  return schoolLocationForSummary(school)?.id ?? (school.managementType === "unknown" ? "unknown" : `${school.managementType}:${privateSchoolKey(school.school)}`);
-}
-
-function privateSchoolKey(value: string): string {
-  const ignored = new Set(["instituto", "colegio", "escuela", "privado", "privada", "secundaria", "educacion", "de", "del", "la", "el"]);
-  return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR").replace(/[^a-z0-9]+/g, " ").trim().split(/\s+/).filter((token) => token && !ignored.has(token)).join(" ");
+  return officialSchoolId(school);
 }
 
 function surveyedSchools(): Array<{ location: SchoolLocation; summary: SchoolSummary; id: string }> {
@@ -885,15 +739,9 @@ function visibleSurveyedSchools(): Array<{ location: SchoolLocation; summary: Sc
 
 function resolvedMapPoints(): ResolvedMapPoint[] {
   return (data?.mapPoints ?? []).map((point) => {
-    let location: SchoolLocation | null = null;
-    if (point.managementType === "state" && point.schoolNumber !== null) location = STATE_SCHOOLS.find((school) => school.schoolNumber === point.schoolNumber) ?? null;
-    if (point.managementType === "private") {
-      const key = privateSchoolKey(point.school);
-      const matches = PRIVATE_SCHOOLS.filter((school) => privateSchoolKey(school.name) === key);
-      location = matches.length === 1 ? matches[0] : null;
-    }
-    const schoolId = location?.id ?? (point.managementType === "unknown" ? "unknown" : `${point.managementType}:${privateSchoolKey(point.school)}`);
-    return { ...point, schoolId, color: colorFor(schoolId), location };
+    const location = schoolLocation(point);
+    const schoolId = officialSchoolId(point);
+    return { ...point, school: officialSchoolName(point), schoolId, color: colorFor(schoolId), location };
   });
 }
 
@@ -984,15 +832,7 @@ function colorFor(school: string): string {
 function saveTarget(): void {
   const input = document.querySelector<HTMLInputElement>("#target");
   const value = Number(input?.value);
-  if (Number.isFinite(value) && value > 0) {
-    localStorage.setItem("dashboard-target", String(Math.round(value)));
-    render();
-  }
-}
-
-function loadTarget(): number {
-  const stored = Number(localStorage.getItem("dashboard-target"));
-  return Number.isFinite(stored) && stored > 0 ? stored : 1500;
+  if (savePopulationTarget(localStorage, activePopulation, value)) render();
 }
 
 function updateSyncLabel(): void {
@@ -1000,7 +840,12 @@ function updateSyncLabel(): void {
   if (!label) return;
   if (!lastSuccessfulFetch) { label.textContent = "Iniciando enlace…"; return; }
   const seconds = Math.floor((Date.now() - lastSuccessfulFetch) / 1000);
-  label.textContent = warning ? `Última conexión válida hace ${seconds} s` : `Conexión comprobada hace ${seconds} s`;
+  const payloads = [studentData, teacherData, familyData].filter((payload): payload is DashboardPayload => payload !== null);
+  const oldest = payloads.sort((left, right) => Date.parse(left.generatedAt) - Date.parse(right.generatedAt))[0];
+  const dataStatus = oldest ? ` · corte más antiguo hace ${formatDataAge(oldest.generatedAt)}` : "";
+  label.textContent = warning
+    ? `Última conexión válida hace ${seconds} s${dataStatus}`
+    : `Conexión comprobada hace ${seconds} s${dataStatus}`;
 }
 
 function formatDateTime(value: string): string {
@@ -1038,6 +883,12 @@ function warningElement(): HTMLElement {
 
 function warningMarkup(): string {
   return warning ? `<div class="warning">Enlace inestable: ${escapeHtml(warning)}. Se conservan los últimos datos y se reintentará automáticamente.</div>` : "";
+}
+
+function freshnessWarningMarkup(payload: DashboardPayload): string {
+  return isDataStale(payload.generatedAt)
+    ? `<div class="warning">El corte de ${POPULATION_LABELS[activePopulation].toLocaleLowerCase("es-AR")} tiene más de cinco minutos durante el horario operativo. Se muestra el último dato disponible.</div>`
+    : "";
 }
 
 function formatNumber(value: number): string { return new Intl.NumberFormat("es-AR").format(value); }

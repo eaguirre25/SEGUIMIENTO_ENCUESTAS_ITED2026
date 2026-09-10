@@ -2,7 +2,7 @@ name: Desplegar frontend en GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ["frontend/**", "package-lock.json", ".github/workflows/deploy-pages.yml"]
+    paths: ["shared/**", "frontend/**", "package-lock.json", ".github/workflows/deploy-pages.yml"]
   workflow_dispatch:
 permissions:
   contents: read

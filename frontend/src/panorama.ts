@@ -1,4 +1,7 @@
+import { officialSchoolId, officialSchoolName } from "./school-catalog";
 import type { AgeGroup, DashboardPayload, DemographicSummary, ManagementType, SchoolSummary } from "./types";
+import { formatCutDate, formatDataAge, isDataStale } from "./freshness";
+import { buildTimelineModel, timelinePath, timelineTicks } from "./timeline";
 
 export type Population = "students" | "teachers" | "families";
 export type PopulationData = Record<Population, DashboardPayload>;
@@ -41,6 +44,7 @@ export function renderPanoramaGeneral(root: HTMLElement, payloads: PopulationDat
 
   root.innerHTML = `
     <div id="panorama-warning-slot"></div>
+    ${freshnessBanner(payloads)}
     <section class="panorama-heading">
       <div><p class="eyebrow">SÍNTESIS TRANSVERSAL</p><h2>Panorama general de la encuesta</h2><p>Cobertura, composición y avance de Estudiantes, Docentes y Familias.</p></div>
       <label class="panorama-filter">Escuela
@@ -50,6 +54,7 @@ export function renderPanoramaGeneral(root: HTMLElement, payloads: PopulationDat
         </select>
       </label>
     </section>
+    ${sourceCuts(payloads)}
     <section class="panorama-kpis" aria-label="Indicadores generales">
       ${kpi("Total de respuestas registradas", total, `${formatNumber(complete)} completas · ${formatNumber(total - complete)} incompletas`, "total")}
       ${kpi("Estudiantes", totals.students, percentCaption(totals.students, total), "students")}
@@ -92,10 +97,7 @@ function combineSchools(payloads: PopulationData): CombinedSchool[] {
   for (const population of POPULATIONS) {
     for (const school of payloads[population].schools) {
       const id = schoolId(school);
-      const f = fold(school.school);
-      const isEes6 = school.schoolNumber === 6 || /\balfon[cs]ina\b/.test(f) || ["e e s", "a estudiar", "hh"].includes(f) || /^(?:ees|es|media|escuela secundaria) ?(?:n )?0*6(?: |$)/.test(f);
-      const isEps47 = id === "state:47" || id === "institution:eps-47-408" || school.schoolNumber === 47 || f.includes("408") || f === "eps 408 es47";
-      const canonicalLabel = isEes6 ? "EES 6" : isEps47 ? "EPS 408 (ES47)" : school.school;
+      const canonicalLabel = officialSchoolName(school);
       const current = combined.get(id) ?? {
         id,
         label: canonicalLabel,
@@ -107,14 +109,9 @@ function combineSchools(payloads: PopulationData): CombinedSchool[] {
       current.schools[population] = school;
       current.counts[population] += school.total;
       current.total += school.total;
-      if (isEes6) {
-        current.label = "EES 6";
-        current.managementType = "state";
-      } else if (isEps47) {
-        current.label = "EPS 408 (ES47)";
-      } else if (school.managementType === "state" && current.managementType !== "state") {
-        current.label = school.school;
-        current.managementType = "state";
+      if (current.managementType === "unknown" && school.managementType !== "unknown") {
+        current.managementType = school.managementType;
+        current.label = canonicalLabel;
       }
       combined.set(id, current);
     }
@@ -123,11 +120,7 @@ function combineSchools(payloads: PopulationData): CombinedSchool[] {
 }
 
 function schoolId(school: SchoolSummary): string {
-  const f = fold(school.school);
-  if (school.schoolNumber === 6 || /\balfon[cs]ina\b/.test(f) || ["e e s", "a estudiar", "hh"].includes(f) || /^(?:ees|es|media|escuela secundaria) ?(?:n )?0*6(?: |$)/.test(f)) return "state:6";
-  if (school.schoolNumber === 47 || f.includes("408") || f === "eps 408 es47" || f === "eps 47 408" || f === "ees 47 408" || f === "ees47 408" || f === "ees 47") return "state:47";
-  if (school.schoolNumber !== null) return `state:${school.schoolNumber}`;
-  return `${school.managementType}:${fold(school.school)}`;
+  return officialSchoolId(school);
 }
 
 function populationTotals(payloads: PopulationData, school: CombinedSchool | null): Record<Population, number> {
@@ -275,46 +268,57 @@ function coverageKpi(label: string, value: number, caption: string): string {
 
 function timelineMarkup(payloads: PopulationData, school: CombinedSchool | null): string {
   const datesByPopulation = Object.fromEntries(POPULATIONS.map((population) => [population, filteredDates(payloads[population], school?.schools[population] ?? null)])) as Record<Population, string[]>;
-  const dates = [...new Set(POPULATIONS.flatMap((population) => datesByPopulation[population]))].sort();
-  if (!dates.length) return "";
-  const cumulative = Object.fromEntries(POPULATIONS.map((population) => {
-    const frequencies = new Map<string, number>();
-    for (const date of datesByPopulation[population]) frequencies.set(date, (frequencies.get(date) ?? 0) + 1);
-    let running = 0;
-    return [population, dates.map((date) => (running += frequencies.get(date) ?? 0))];
-  })) as Record<Population, number[]>;
-  const totalSeries = dates.map((_, index) => POPULATIONS.reduce((sum, population) => sum + cumulative[population][index], 0));
-  const maximum = Math.max(...totalSeries, 1);
+  const model = buildTimelineModel(datesByPopulation);
+  if (!model) return "";
   const width = 960;
-  const height = 260;
-  const point = (value: number, index: number) => `${dates.length === 1 ? width / 2 : index / (dates.length - 1) * width},${height - value / maximum * (height - 20)}`;
+  const height = 300;
+  const plot = { left: 58, right: 14, top: 12, bottom: 258 };
+  const point = (value: number, index: number) => {
+    const x = model.epochs.length === 1 ? (plot.left + width - plot.right) / 2
+      : plot.left + (model.epochs[index] - model.startEpoch) / (model.endEpoch - model.startEpoch) * (width - plot.left - plot.right);
+    const y = plot.bottom - value / model.maximum * (plot.bottom - plot.top);
+    return { x, y };
+  };
   const series: Array<{ label: string; color: string; values: number[] }> = [
-    { label: "Total", color: "#f4f6fa", values: totalSeries },
-    ...POPULATIONS.map((population) => ({ label: LABELS[population], color: COLORS[population], values: cumulative[population] })),
+    { label: "Total", color: "#f4f6fa", values: model.total },
+    ...POPULATIONS.map((population) => ({ label: LABELS[population], color: COLORS[population], values: model.cumulative[population] })),
   ];
-  const chart = `<div class="timeline-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Evolución acumulada de respuestas">${[0, .25, .5, .75, 1].map((ratio) => `<line x1="0" x2="${width}" y1="${height - ratio * (height - 20)}" y2="${height - ratio * (height - 20)}"/>`).join("")}${series.map((item) => `<polyline points="${item.values.map(point).join(" ")}" style="stroke:${item.color}"/>${item.values.map((value, index) => `<circle cx="${point(value, index).split(",")[0]}" cy="${point(value, index).split(",")[1]}" r="3" style="fill:${item.color}"><title>${item.label} · ${formatDate(dates[index])}: N=${value} · ${formatPct(totalSeries[index] ? value / totalSeries[index] * 100 : 0)}</title></circle>`).join("")}`).join("")}</svg><div class="timeline-axis"><span>${formatDate(dates[0])}</span><span>${formatDate(dates.at(-1) ?? dates[0])}</span></div></div><div class="timeline-legend"><span class="total">Total · N=${formatNumber(totalSeries.at(-1) ?? 0)} · 100,0 %</span>${POPULATIONS.map((population) => `<span style="--legend:${COLORS[population]}">${LABELS[population]} · N=${formatNumber(cumulative[population].at(-1) ?? 0)} · ${formatPct((totalSeries.at(-1) ?? 0) ? (cumulative[population].at(-1) ?? 0) / (totalSeries.at(-1) ?? 1) * 100 : 0)}</span>`).join("")}</div>`;
-  return panel("Evolución temporal del relevamiento", "Cantidad acumulada de respuestas con fecha válida", chart, "panorama-full");
+  const yTicks = [...new Set([0, .25, .5, .75, 1].map((ratio) => Math.round(model.maximum * ratio)))].map((value) => {
+    const y = point(value, 0).y;
+    return `<line x1="${plot.left}" x2="${width - plot.right}" y1="${y}" y2="${y}"/><text x="${plot.left - 9}" y="${y + 4}" text-anchor="end">${formatNumber(value)}</text>`;
+  }).join("");
+  const xTicks = timelineTicks(model.startEpoch, model.endEpoch, 6).map((tick) => {
+    const x = model.startEpoch === model.endEpoch ? (plot.left + width - plot.right) / 2
+      : plot.left + (tick.epoch - model.startEpoch) / (model.endEpoch - model.startEpoch) * (width - plot.left - plot.right);
+    return `<line class="timeline-x-grid" x1="${x}" x2="${x}" y1="${plot.top}" y2="${plot.bottom}"/><text x="${x}" y="${plot.bottom + 25}" text-anchor="middle">${formatDate(tick.date)}</text>`;
+  }).join("");
+  const chart = `<div class="timeline-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="timeline-title timeline-desc"><title id="timeline-title">Evolución acumulada de respuestas</title><desc id="timeline-desc">Escala horizontal proporcional a los días transcurridos. Las líneas avanzan por escalones en las fechas con nuevas respuestas.</desc>${yTicks}${xTicks}${series.map((item) => {
+    const points = item.values.map((value, index) => point(value, index));
+    return `<path d="${timelinePath(points)}" style="stroke:${item.color}"/>${item.values.map((value, index) => `<circle cx="${points[index].x}" cy="${points[index].y}" r="3" style="fill:${item.color}"><title>${item.label} · ${formatDate(model.dates[index])}: N=${value} · ${formatPct(model.total[index] ? value / model.total[index] * 100 : 0)}</title></circle>`).join("")}`;
+  }).join("")}</svg></div><div class="timeline-legend"><span class="total">Total · N=${formatNumber(model.total.at(-1) ?? 0)} · 100,0 %</span>${POPULATIONS.map((population) => `<span style="--legend:${COLORS[population]}">${LABELS[population]} · N=${formatNumber(model.cumulative[population].at(-1) ?? 0)} · ${formatPct((model.total.at(-1) ?? 0) ? (model.cumulative[population].at(-1) ?? 0) / (model.total.at(-1) ?? 1) * 100 : 0)}</span>`).join("")}</div>`;
+  return panel("Evolución temporal del relevamiento", "Cantidad acumulada de respuestas con fecha válida · escala proporcional al tiempo", chart, "panorama-full");
+}
+
+function sourceCuts(payloads: PopulationData): string {
+  return `<section class="source-cuts" aria-label="Fecha de los datos por población">${POPULATIONS.map((population) => {
+    const generatedAt = payloads[population].generatedAt;
+    const stale = isDataStale(generatedAt);
+    return `<article class="${stale ? "stale" : ""}"><span>${LABELS[population]}</span><strong>${formatCutDate(generatedAt)}</strong><small>hace ${formatDataAge(generatedAt)}</small></article>`;
+  }).join("")}</section>`;
+}
+
+function freshnessBanner(payloads: PopulationData): string {
+  const stale = POPULATIONS.filter((population) => isDataStale(payloads[population].generatedAt));
+  if (!stale.length) return "";
+  return `<div class="warning freshness-warning">Datos desactualizados durante el horario operativo: ${stale.map((population) => LABELS[population]).join(", ")}. Se muestra el último corte disponible.</div>`;
 }
 
 function filteredDates(payload: DashboardPayload, school: SchoolSummary | null): string[] {
-  return payload.monitoringRows.filter((row) => /^\d{4}-\d{2}-\d{2}$/.test(row.date) && (!school || rowMatchesSchool(row.school, row.managementType, school))).map((row) => row.date);
+  return payload.monitoringRows.filter((row) => /^\d{4}-\d{2}-\d{2}$/.test(row.date) && (!school || rowMatchesSchool(row.resolvedSchool, row.managementType, school, row.inSanMartin))).map((row) => row.date);
 }
 
-function rowMatchesSchool(label: string, managementType: ManagementType, school: SchoolSummary): boolean {
-  const sf = fold(school.school);
-  if (sf === "eps 408 es47" || sf === "eps 47 408" || sf === "ees 47 408" || sf === "ees47 408" || sf === "ees 47") {
-    const lf = fold(label);
-    return /408/.test(lf) || /^eps(?: |$)/.test(lf) || /^(?:ees|es|media)? ?47(?: |$)/.test(lf) || /^escuela (?:profesional|secundaria)/.test(lf);
-  }
-  if (school.schoolNumber !== null) return managementType === "state" && singleSchoolNumber(label) === school.schoolNumber;
-  return managementType === school.managementType && fold(label) === fold(school.school);
-}
-
-function singleSchoolNumber(value: string): number | null {
-  const matches = value.match(/\d+/g);
-  if (!matches || matches.length !== 1) return null;
-  const number = Number(matches[0]);
-  return number >= 1 && number <= 99 ? number : null;
+function rowMatchesSchool(label: string, managementType: ManagementType, school: SchoolSummary, inSanMartin?: boolean | null): boolean {
+  return officialSchoolId({ school: label, schoolNumber: null, managementType, inSanMartin }) === schoolId(school);
 }
 
 function populationLegend(): string {

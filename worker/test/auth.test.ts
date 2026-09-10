@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import worker, { isDashboardRefreshPaused } from "../src/index";
+import worker, { isDashboardCacheStale, isDashboardRefreshPaused } from "../src/index";
 import type { Env } from "../src/types";
 
 const env: Env = {
@@ -93,5 +93,18 @@ describe("pausa nocturna durante los días hábiles", () => {
   it("se inicia a las 23:00 hora de Buenos Aires", () => {
     expect(isDashboardRefreshPaused(Date.parse("2026-08-18T01:59:59Z"))).toBe(false);
     expect(isDashboardRefreshPaused(Date.parse("2026-08-18T02:00:00Z"))).toBe(true);
+  });
+});
+
+describe("frescura de la caché", () => {
+  const now = Date.parse("2026-09-10T15:00:00Z");
+
+  it("acepta cortes de hasta cinco minutos", () => {
+    expect(isDashboardCacheStale("2026-09-10T14:55:00Z", now)).toBe(false);
+  });
+
+  it("marca cortes más antiguos o inválidos", () => {
+    expect(isDashboardCacheStale("2026-09-10T14:54:59Z", now)).toBe(true);
+    expect(isDashboardCacheStale("fecha inválida", now)).toBe(true);
   });
 });

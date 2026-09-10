@@ -1,3 +1,12 @@
+import {
+  canonicalSchoolLabel,
+  EPS408_NAME,
+  REVIEW_REQUIRED_NAME,
+  parseSchoolNumber,
+  resolveStudentSchool,
+  schoolIdentityKey,
+} from "../../shared/schools";
+export { parseSchoolNumber } from "../../shared/schools";
 import { QUESTION_MAP } from "./question-map";
 import type {
   AgeGroup,
@@ -12,7 +21,7 @@ import type {
   SchoolSummary,
 } from "./types";
 
-type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL" | "ROLE" | "ROLE_OTHER" | "IN_SAN_MARTIN" | "AGE" | "GENDER";
+type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL" | "ROLE" | "ROLE_OTHER" | "IN_SAN_MARTIN" | "AGE" | "GENDER" | "EXTERNAL_SCHOOL";
 export type QuestionMap = Omit<Record<keyof typeof QUESTION_MAP, string | readonly string[] | null>, OptionalSchoolBranch>
   & Partial<Record<OptionalSchoolBranch, string | readonly string[] | null>>;
 
@@ -22,14 +31,6 @@ export const LEGACY_EXCLUDED_TEST_RESPONSE_KEYS = new Set([
   "2026-08-11|23:24:09|sin informar|s6|unknown|4|incomplete",
   "2026-08-11|22:09:20|sin informar|sin informar|unknown||incomplete",
 ]);
-
-const STATE_SCHOOL_NUMBER_ALIASES: Readonly<Record<string, number>> = {
-  "alfonsina storni": 6,
-  "alfoncina storni": 6,
-  "e e s": 6,
-  "a estudiar": 6,
-  "hh": 6,
-};
 
 const SAN_MARTIN_BOUNDS = {
   minLat: -34.66,
@@ -42,10 +43,10 @@ export const AGE_GROUPS: readonly AgeGroup[] = [
   "Hasta 15", "16–18", "19–29", "30–39", "40–49", "50–59", "60 o más",
 ];
 
-export function normalizeSchool(value: unknown): { original: string; key: string } | null {
+export function normalizeSchool(value: unknown, managementType: ManagementType = "unknown"): { original: string; key: string } | null {
   if (typeof value !== "string" && typeof value !== "number") return null;
   const cleaned = String(value).trim().replace(/\s+/g, " ");
-  const original = canonicalSchoolLabel(cleaned);
+  const original = canonicalSchoolLabel(cleaned, managementType);
   if (!original) return null;
   return {
     original,
@@ -53,65 +54,9 @@ export function normalizeSchool(value: unknown): { original: string; key: string
   };
 }
 
-function canonicalSchoolLabel(value: string): string {
-  if (!value) return value;
-  const folded = foldSchoolText(value);
-  if (isEes6Alias(folded)) return "EES 6";
-  if (isEes4Alias(folded)) return "EES 4";
-  if (
-    /408/.test(folded) ||
-    /^eps(?: |$)/.test(folded) ||
-    /^(?:ees|es|media)? ?47(?: |$)/.test(folded) ||
-    /^escuela (?:profesional|secundaria|profesional secundaria|secundaria profesional)/.test(folded)
-  ) {
-    return "EPS 408 (ES47)";
-  }
-  const schoolNumber = parseSchoolNumber(folded);
-  if (schoolNumber === null) return value;
-  const number = String(schoolNumber);
-  const onlyNumber = folded === String(Number(folded));
-  const schoolMarker = new RegExp(`(?:^| )(?:eesn|ees|ee|es|n|numero|escuela|secundaria|media|md) *0*${number}(?: |$)`).test(folded);
-  if (schoolNumber === 4 && (onlyNumber || schoolMarker)) return "EES 4";
-  return onlyNumber || schoolMarker ? `EES ${number}` : value;
-}
-
-export function parseSchoolNumber(value: unknown): number | null {
-  if (typeof value !== "string" && typeof value !== "number") return null;
-  const matches = String(value).match(/\d+/g);
-  if (!matches || matches.length !== 1) return null;
-  const parsed = Number(matches[0]);
-  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 99 ? parsed : null;
-}
-
 function parseStateSchoolNumber(value: unknown): number | null {
-  const parsed = parseSchoolNumber(value);
-  if (parsed !== null) return parsed;
-  if (typeof value !== "string") return null;
-  const folded = foldSchoolText(value);
-  if (isEes6Alias(folded)) return 6;
-  return STATE_SCHOOL_NUMBER_ALIASES[folded] ?? null;
-}
-
-function isEes6Alias(folded: string): boolean {
-  if (/\balfon[cs]ina\b/.test(folded)) return true;
-  if (["e e s", "a estudiar", "hh"].includes(folded)) return true;
-  const compact = folded.replace(/\s+/g, "");
-  return /^(?:ees|es|media|escuelasecundaria)(?:n|no|numero)?0*6(?:\D|$)/.test(compact);
-}
-
-function isEes4Alias(folded: string): boolean {
-  if (/\bricardo rojas\b/.test(folded)) return true;
-  const compact = folded.replace(/\s+/g, "");
-  return /^(?:ees|es|esn|media|secundaria|escuelasecundaria|escueladeeducacionsecundaria)(?:n|no|numero)?0*4(?:\D|$)/.test(compact);
-}
-
-function foldSchoolText(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLocaleLowerCase("es-AR")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  return parseSchoolNumber(canonicalSchoolLabel(String(value)));
 }
 
 export function detectCompletion(raw: RawResponse, field = "submitdate"): boolean {
@@ -120,7 +65,7 @@ export function detectCompletion(raw: RawResponse, field = "submitdate"): boolea
   if (value === false || value === 0 || value == null) return false;
   if (typeof value !== "string") return Boolean(value);
   const normalized = value.trim().toLocaleLowerCase("es-AR");
-  if (!normalized || ["n", "no", "false", "incomplete", "incompleta", "0"].includes(normalized)) return false;
+  if (!normalized || ["n", "no", "false", "incomplete", "incompleta", "0", "null", "0000-00-00", "0000-00-00 00:00:00"].includes(normalized)) return false;
   return true;
 }
 
@@ -177,7 +122,7 @@ export function normalizeResponse(raw: RawResponse, map: QuestionMap): Normalize
   if (!map.SCHOOL) throw new Error("Falta configurar QUESTION_MAP.SCHOOL en src/question-map.ts");
   const identity = identifySchool(raw, map);
   if (!identity) return null;
-  const { school, schoolNumber, managementType } = identity;
+  const { school, schoolNumber, managementType, classificationMethod, reviewReason } = identity;
   const lat = map.LATITUDE ? parseCoordinate(readMappedValue(raw, map.LATITUDE), "lat") : null;
   const lon = map.LONGITUDE ? parseCoordinate(readMappedValue(raw, map.LONGITUDE), "lon") : null;
   return {
@@ -191,6 +136,8 @@ export function normalizeResponse(raw: RawResponse, map: QuestionMap): Normalize
     lon,
     ageGroup: map.AGE ? parseAgeGroup(readMappedValue(raw, map.AGE)) : null,
     gender: map.GENDER ? normalizeGender(readMappedValue(raw, map.GENDER)) : null,
+    classificationMethod,
+    ...(reviewReason ? { reviewReason } : {}),
   };
 }
 
@@ -198,10 +145,24 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
   school: { original: string; key: string };
   schoolNumber: number | null;
   managementType: ManagementType;
+  classificationMethod: NormalizedResponse["classificationMethod"];
+  reviewReason?: NormalizedResponse["reviewReason"];
 } | null {
   const inSanMartin = map.IN_SAN_MARTIN ? parseYesNo(readMappedValue(raw, map.IN_SAN_MARTIN)) : null;
   let managementType = normalizeManagementType(readSemanticValue(raw, map.MANAGEMENT_TYPE, isManagementAnswer));
-  const genericSchoolValue = map.SCHOOL ? readMappedValue(raw, map.SCHOOL) : null;
+  const genericSchoolValue = readSchoolBranch(raw, map);
+  if (map.SCHOOL_IDENTIFIER && inSanMartin !== false) {
+    const resolution = resolveStudentSchool(genericSchoolValue, readMappedValue(raw, map.SCHOOL_IDENTIFIER), managementType);
+    const school = normalizeSchool(resolution.identity.school, resolution.identity.managementType);
+    if (!school) return null;
+    return {
+      school,
+      schoolNumber: resolution.identity.schoolNumber,
+      managementType: resolution.identity.managementType,
+      classificationMethod: resolution.method,
+      ...(resolution.reviewReason ? { reviewReason: resolution.reviewReason } : {}),
+    };
+  }
   const stateSchoolValue = map.STATE_SCHOOL ? readMappedValue(raw, map.STATE_SCHOOL) : genericSchoolValue;
   const privateSchoolValue = map.PRIVATE_SCHOOL ? readMappedValue(raw, map.PRIVATE_SCHOOL) : genericSchoolValue;
   const isStateSchool = managementType === "state";
@@ -209,33 +170,37 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
   let mappedSchoolValue = isStateSchool
     ? (schoolNumber === null ? stateSchoolValue : `EES ${schoolNumber}`)
     : managementType === "private" ? privateSchoolValue : genericSchoolValue;
-  let school = inSanMartin === false ? normalizeExternalSchool(mappedSchoolValue) : normalizeSchool(mappedSchoolValue);
-  if (managementType === "unknown" && inSanMartin !== false && school?.original.match(/^EES \d+$/)) {
+  let school = inSanMartin === false ? normalizeExternalSchool(mappedSchoolValue) : normalizeSchool(mappedSchoolValue, managementType);
+  if (managementType === "unknown" && inSanMartin !== false && school && (school.original.startsWith("EES ") || school.original.startsWith("ESCUELA DE EDUCACIÓN SECUNDARIA Nº"))) {
     managementType = "state";
     schoolNumber = parseSchoolNumber(school.original);
     mappedSchoolValue = schoolNumber === null ? mappedSchoolValue : `EES ${schoolNumber}`;
-    school = normalizeSchool(mappedSchoolValue);
+    school = normalizeSchool(mappedSchoolValue, managementType);
   }
   if (!school) return null;
-  if (school.original === "EPS 408 (ES47)") {
-    schoolNumber = 47;
+  if (inSanMartin !== false && school.original === EPS408_NAME) {
+    schoolNumber = null;
     managementType = "state";
   }
-  return { school, schoolNumber, managementType };
+  return { school, schoolNumber, managementType, classificationMethod: "direct" };
 }
 
 function normalizeExternalSchool(value: unknown): { original: string; key: string } | null {
   if (typeof value !== "string" && typeof value !== "number") return null;
   const original = String(value).trim().replace(/\s+/g, " ");
   if (!original) return null;
-  const canonical = canonicalSchoolLabel(original);
-  if (canonical === "EPS 408 (ES47)") {
-    return { original: "EPS 408 (ES47)", key: "eps 408 (es47)" };
-  }
   return {
     original,
     key: `external:${original.normalize("NFKC").toLocaleLowerCase("es-AR")}`,
   };
+}
+
+function readSchoolBranch(raw: RawResponse, map: QuestionMap): unknown {
+  if (map.EXTERNAL_SCHOOL && map.IN_SAN_MARTIN
+    && parseYesNo(readMappedValue(raw, map.IN_SAN_MARTIN)) === false) {
+    return readMappedValue(raw, map.EXTERNAL_SCHOOL);
+  }
+  return map.SCHOOL ? readMappedValue(raw, map.SCHOOL) : null;
 }
 
 function schoolAnswerAsReceived(raw: RawResponse, map: QuestionMap): string {
@@ -245,7 +210,7 @@ function schoolAnswerAsReceived(raw: RawResponse, map: QuestionMap): string {
     : managementType === "private" && map.PRIVATE_SCHOOL
       ? map.PRIVATE_SCHOOL
       : map.SCHOOL;
-  const value = field ? readMappedValue(raw, field) : null;
+  const value = map.IN_SAN_MARTIN ? readSchoolBranch(raw, map) : field ? readMappedValue(raw, field) : null;
   return value === null || value === undefined ? "Sin informar" : String(value);
 }
 
@@ -349,10 +314,9 @@ export function buildDashboard(
   excludedResponseKeys: ReadonlySet<string> = LEGACY_EXCLUDED_TEST_RESPONSE_KEYS,
 ): DashboardPayload {
   const includedResponses = rawResponses.filter((raw) => !isExcludedTestResponse(raw, map, excludedResponseKeys));
-  const normalized = includedResponses.flatMap((raw) => {
-    const item = normalizeResponse(raw, map);
-    return item ? [item] : [];
-  });
+  const classified = includedResponses.map((raw) => ({ raw, item: normalizeResponse(raw, map) }));
+  applyTemporalSchoolInference(classified, map);
+  const normalized = classified.flatMap(({ item }) => item ? [item] : []);
   const summary = emptyCounts();
   const demographics = emptyDemographics();
   const schools = new Map<string, SchoolSummary>();
@@ -372,6 +336,7 @@ export function buildDashboard(
     if (!school) {
       school = {
         school: item.school,
+        ...(item.schoolKey.startsWith("external:") ? { inSanMartin: false } : {}),
         schoolNumber: item.schoolNumber,
         managementType: item.managementType,
         ...emptyCounts(),
@@ -413,22 +378,21 @@ export function buildDashboard(
     summary: finishCounts(summary),
     demographics: finishDemographics(demographics),
     schools: schoolList,
-    mapPoints: includedResponses.flatMap((raw) => {
+    mapPoints: classified.flatMap(({ raw, item }) => {
       const lat = map.LATITUDE ? parseCoordinate(readMappedValue(raw, map.LATITUDE), "lat") : null;
       const lon = map.LONGITUDE ? parseCoordinate(readMappedValue(raw, map.LONGITUDE), "lon") : null;
       if (lat === null || lon === null || !isCoordinateInSanMartin(lat, lon)) return [];
-      const identity = identifySchool(raw, map);
       return [{
-        school: identity?.school.original ?? "Sin escuela identificada",
-        schoolNumber: identity?.schoolNumber ?? null,
-        managementType: identity?.managementType ?? "unknown",
+        school: item?.school ?? REVIEW_REQUIRED_NAME,
+        schoolNumber: item?.schoolNumber ?? null,
+        managementType: item?.managementType ?? "unknown",
         complete: detectCompletion(raw, completionField),
         lat,
         lon,
       }];
     }),
-    monitoringRows: includedResponses
-      .map((raw) => toMonitoringRow(raw, map))
+    monitoringRows: classified
+      .map(({ raw, item }) => toMonitoringRow(raw, map, item))
       .sort((left, right) => `${right.date} ${right.time}`.localeCompare(`${left.date} ${left.time}`)),
   };
 }
@@ -438,23 +402,73 @@ export function isExcludedTestResponse(
   map: QuestionMap = QUESTION_MAP,
   excludedResponseKeys: ReadonlySet<string> = LEGACY_EXCLUDED_TEST_RESPONSE_KEYS,
 ): boolean {
-  return excludedResponseKeys.has(monitoringRowKey(toMonitoringRow(raw, map)));
+  const row = toMonitoringRow(raw, map);
+  const declaredManagement = normalizeManagementType(readSemanticValue(raw, map.MANAGEMENT_TYPE, isManagementAnswer));
+  return excludedResponseKeys.has(monitoringRowKey({
+    ...row,
+    managementType: declaredManagement,
+  }));
 }
 
-function toMonitoringRow(raw: RawResponse, map: QuestionMap): LoadMonitoringRow {
+function toMonitoringRow(raw: RawResponse, map: QuestionMap, normalized?: NormalizedResponse | null): LoadMonitoringRow {
   const timestamp = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(raw, map.LOAD_TIMESTAMP) : null);
-  const identity = identifySchool(raw, map);
+  const identity = normalized ?? normalizeResponse(raw, map);
   return {
     date: timestamp.date,
     time: timestamp.time,
     school: schoolAnswerAsReceived(raw, map),
     schoolIdentifier: answerAsReceived(map.SCHOOL_IDENTIFIER ? readMappedValue(raw, map.SCHOOL_IDENTIFIER) : null),
+    resolvedSchool: identity?.school ?? REVIEW_REQUIRED_NAME,
+    classificationMethod: identity?.classificationMethod ?? "requires_review",
+    ...(identity?.reviewReason ? { reviewReason: identity.reviewReason } : {}),
     role: teacherRoleAsReceived(raw, map),
     managementType: identity?.managementType ?? "unknown",
     courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
     inSanMartin: map.IN_SAN_MARTIN ? parseYesNo(readMappedValue(raw, map.IN_SAN_MARTIN)) : null,
     complete: detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
   };
+}
+
+function applyTemporalSchoolInference(
+  rows: Array<{ raw: RawResponse; item: NormalizedResponse | null }>,
+  map: QuestionMap,
+): void {
+  if (!map.SCHOOL_IDENTIFIER) return;
+  const timed = rows.map((row) => ({ ...row, timestamp: responseTimestamp(row.raw, map) }));
+  const anchors = timed.filter((row) => row.item && row.item.classificationMethod !== "requires_review" && row.timestamp !== null);
+  for (const row of timed) {
+    if (!row.item || row.item.reviewReason !== "insufficient" || row.timestamp === null) continue;
+    const nearby = anchors.filter((anchor) => anchor.timestamp !== null && sameSurveyDate(anchor.timestamp, row.timestamp!)
+      && Math.abs(anchor.timestamp - row.timestamp!) <= 120 * 60_000);
+    if (nearby.length < 2) continue;
+    const counts = new Map<string, { item: NormalizedResponse; count: number }>();
+    for (const anchor of nearby) {
+      const key = schoolIdentityKey(anchor.item!);
+      const current = counts.get(key) ?? { item: anchor.item!, count: 0 };
+      current.count += 1;
+      counts.set(key, current);
+    }
+    if (counts.has("state:24") && counts.has("state:47")) continue;
+    const dominant = [...counts.values()].sort((left, right) => right.count - left.count)[0];
+    if (!dominant || dominant.count / nearby.length < 0.8) continue;
+    row.item.school = dominant.item.school;
+    row.item.schoolKey = dominant.item.schoolKey;
+    row.item.schoolNumber = dominant.item.schoolNumber;
+    row.item.managementType = dominant.item.managementType;
+    row.item.classificationMethod = "time_window";
+    delete row.item.reviewReason;
+  }
+}
+
+function responseTimestamp(raw: RawResponse, map: QuestionMap): number | null {
+  const { date, time } = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(raw, map.LOAD_TIMESTAMP) : null);
+  const match = `${date} ${time || "00:00:00"}`.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) return null;
+  return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6] ?? 0));
+}
+
+function sameSurveyDate(left: number, right: number): boolean {
+  return new Date(left).toISOString().slice(0, 10) === new Date(right).toISOString().slice(0, 10);
 }
 
 function teacherRoleAsReceived(raw: RawResponse, map: QuestionMap): string {

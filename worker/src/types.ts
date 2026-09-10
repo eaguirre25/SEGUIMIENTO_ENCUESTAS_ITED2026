@@ -24,6 +24,8 @@ export interface NormalizedResponse {
   lon: number | null;
   ageGroup: AgeGroup | null;
   gender: string | null;
+  classificationMethod: SchoolClassificationMethod;
+  reviewReason?: SchoolReviewReason;
 }
 
 export interface Counts {
@@ -42,6 +44,7 @@ export interface RoleCounts extends Counts {
 }
 
 export interface SchoolSummary extends Counts {
+  inSanMartin?: boolean | null;
   school: string;
   schoolNumber: number | null;
   managementType: ManagementType;
@@ -71,6 +74,9 @@ export interface LoadMonitoringRow {
   time: string;
   school: string;
   schoolIdentifier: string;
+  resolvedSchool: string;
+  classificationMethod: SchoolClassificationMethod;
+  reviewReason?: SchoolReviewReason;
   role: string;
   managementType: ManagementType;
   courseYear: number | null;
@@ -79,6 +85,8 @@ export interface LoadMonitoringRow {
 }
 
 export type ManagementType = "state" | "private" | "unknown";
+export type SchoolClassificationMethod = "direct" | "id_and_name" | "name_only" | "id_only" | "time_window" | "requires_review";
+export type SchoolReviewReason = "conflict" | "insufficient";
 
 export type AgeGroup = "Hasta 15" | "16–18" | "19–29" | "30–39" | "40–49" | "50–59" | "60 o más";
 

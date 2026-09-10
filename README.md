@@ -47,7 +47,7 @@ Los códigos se verificaron contra RemoteControl 2 y están centralizados en [`w
 - `STATE_SCHOOL`: `Q996548`; se extrae el número escrito para unirlo con `nro_escuel` de la capa oficial.
 - `PRIVATE_SCHOOL`: `Q996592`.
 - `MANAGEMENT_TYPE`: `Q996591` (`Estatal`/`Privada`); no se usa como nombre de escuela.
-- `SCHOOL_IDENTIFIER`: `Q996545` (reservado; todavía no agrupa ni se expone).
+- `SCHOOL_IDENTIFIER`: `Q996545`; se contrasta con la respuesta a “¿A qué escuela vas?” para resolver la institución.
 - `COURSE_YEAR`: `Q449329`.
 - `LATITUDE`: `Q996543[SQ002]`.
 - `LONGITUDE`: `Q996543[SQ003]`.
@@ -208,7 +208,11 @@ Las variables que empiezan por `VITE_` son públicas por diseño; nunca colocar 
 
 El mapa conserva los puntos de matrícula en sus coordenadas informadas y muestra únicamente establecimientos con encuestas aplicadas y ubicación institucional comprobada. Cada escuela se representa con un ícono de edificio; los hilos relacionan la matrícula con su escuela y el mapa de calor transforma los puntos de matrícula visibles.
 
-El nombre se normaliza con `trim`, espacios consecutivos y una clave en minúsculas. Las variantes que contienen “Alfonsina” o “Alfoncina” y las formas inequívocas de EES/ES/Media N.º 6 se consolidan como `EES 6`. Por decisión específica del relevamiento, `E.E.s`, `A estudiar` y `Hh` también integran ese grupo. Las variantes de EES 4, Secundaria 4 y Ricardo Rojas se consolidan como `EES 4`. Estas mismas reglas se vuelven a aplicar en el frontend para integrar correctamente cachés generadas por versiones anteriores del Worker. No se hace fuzzy matching general.
+El nombre se normaliza con `trim`, espacios consecutivos y una clave en minúsculas. En Estudiantes se contrastan el ID de escuela y la respuesta escrita: si coinciden, o sólo uno aporta una identidad inequívoca, se usa la institución resuelta; si se contradicen, el registro se agrupa en `Requieren revisión`. Variantes como “Alfonsina”, “Alfoncina”, “Ala alfosina estonir”, `ALFoNS¡NA` y las formas inequívocas de EES/ES/Media N.º 6 se consolidan con el nombre oficial de la EES Nº6. Textos insuficientes como `E.E.s`, `A estudiar` o `Hh` no se asignan por sí solos.
+
+Los faltantes pueden inferirse por fecha y franja horaria únicamente cuando existen al menos dos respuestas identificadas dentro de ±120 minutos y una escuela concentra como mínimo el 80 %. Los conflictos explícitos nunca se infieren. Si en la misma ventana aparecen la EES Nº24 y la EES Nº47, la inferencia se desactiva y el caso queda para revisión manual.
+
+La EES Nº47 y la Escuela Profesional Secundaria · CFP Nº408 son identidades independientes. Comparten ubicación edilicia en el mapa, pero conservan marcadores, filtros, totales y nombres oficiales separados. Todas las visualizaciones consultan el catálogo oficial para mostrar las denominaciones completas; las respuestas originales permanecen visibles en Monitoreo de carga para facilitar la auditoría.
 
 ## Verificación
 
@@ -220,7 +224,7 @@ npm run typecheck
 npm run build
 ```
 
-Las pruebas cubren normalización de escuela, alias de EES 6, completitud, cursos 1–7, porcentajes, límites territoriales de coordenadas, sesión temporal, contrato final, privacidad y la identidad `completas + incompletas = total`.
+Las pruebas cubren normalización y nombres oficiales, separación entre EES Nº47 y EPS/CFP Nº408, resolución por ID + nombre, revisión de conflictos, inferencia temporal y excepción 24–47, completitud, cursos 1–7, porcentajes, límites territoriales de coordenadas, sesión temporal, contrato final, privacidad y la identidad `completas + incompletas = total`.
 
 ## Poblaciones conectadas
 
@@ -234,11 +238,17 @@ La página inicial **Panorama general de la encuesta** combina esas tres cachés
 
 El navegador comprueba la API cada 60 segundos. El Worker actualiza las tres cachés cada minuto de lunes a viernes entre las 08:00 y las 22:59, hora de Buenos Aires. La interfaz distingue la última conexión exitosa de la fecha real de generación de los datos.
 
+Durante el horario operativo, una caché de más de cinco minutos se considera desactualizada. Una lectura de esa caché intenta regenerarla aun cuando el cron no haya corrido; si LimeSurvey no responde, el Worker entrega el último corte con encabezados de advertencia y el panel lo identifica visualmente. Fuera del horario operativo se conserva el último corte sin generar una falsa alarma. El Panorama muestra por separado la fecha de Estudiantes, Docentes y Familias.
+
+La meta de avance se guarda localmente y por población (`students`, `teachers`, `families`), de modo que cambiar la meta de Docentes no modifica las otras dos. La evolución temporal usa días reales en el eje horizontal y una línea acumulada escalonada: un período sin cargas conserva una meseta en lugar de comprimirse visualmente.
+
+Para combinar instituciones entre poblaciones, las escuelas estatales locales usan su número y las instituciones locales no numeradas usan el nombre canónico sin depender de que todas las encuestas hayan informado la gestión. Las escuelas declaradas fuera de General San Martín mantienen una identidad separada aunque compartan nombre.
+
 Las coordenadas del mapa se validan dentro de un área territorial razonable de General San Martín. Los valores ausentes, inválidos o externos al área no se publican como puntos y se informan en el contador de ubicaciones descartadas.
 
 Las exclusiones de respuestas de prueba se administran en la tabla D1 `dashboard_excluded_responses`. Las migraciones se aplican automáticamente antes del despliegue del Worker.
 
-Para Familias, el seguimiento muestra fecha, hora, vínculo con el/la estudiante, escuela informada, pertenencia a General San Martín, año y estado completa/incompleta. Si la escuela local se responde como un número o dentro de un texto inequívoco (por ejemplo, `13` o `Escuela 13`), se normaliza como `EES 13`. Cuando la familia indica que la escuela no pertenece a General San Martín, el nombre se conserva como fue informado y no se mezcla con una escuela local del mismo número.
+Para Familias, el seguimiento muestra fecha, hora, vínculo con el/la estudiante, escuela oficial resuelta, pertenencia a General San Martín, año y estado completa/incompleta. Si la escuela local se responde como un número o dentro de un texto inequívoco (por ejemplo, `13` o `Escuela 13`), se presenta como `ESCUELA DE EDUCACIÓN SECUNDARIA Nº13`. Cuando la familia indica que la escuela no pertenece a General San Martín, el nombre se conserva como fue informado y no se mezcla con una escuela local del mismo número.
 
 La exportación de Familias se limita a esos campos operativos y a edad/género para su agregación anónima en el Worker. No incorpora esos datos en las filas individuales, ni incorpora domicilio, composición del hogar o respuestas abiertas.
 
