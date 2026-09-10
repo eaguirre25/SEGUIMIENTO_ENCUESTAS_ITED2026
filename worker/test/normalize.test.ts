@@ -427,6 +427,10 @@ describe("agregación segura", () => {
       courseYear: null,
       inSanMartin: null,
       complete: true,
+      answeredRequiredQuestions: null,
+      requiredQuestions: null,
+      missingRequiredQuestions: null,
+      requiredCompletionPct: null,
     }]);
     expect(result.mapPoints).toEqual([]);
   });
@@ -512,6 +516,10 @@ describe("agregación segura", () => {
       courseYear: 3,
       inSanMartin: true,
       complete: true,
+      answeredRequiredQuestions: null,
+      requiredQuestions: null,
+      missingRequiredQuestions: null,
+      requiredCompletionPct: null,
     });
   });
 

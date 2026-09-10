@@ -12,7 +12,7 @@ LimeSurvey Cloud
   → dashboard estático Vite + TypeScript + MapLibre + capa oficial de escuelas
 ```
 
-El Worker abre una sesión, exporta respuestas completas e incompletas con `export_responses` y libera la session key en un bloque `finally`. El navegador nunca se conecta a LimeSurvey. El HTML público no contiene datos: el Worker intercambia el usuario y la contraseña por un token firmado de ocho horas, que se conserva únicamente en `sessionStorage`. La opción de recordar guarda sólo el nombre de usuario.
+El Worker abre una sesión, consulta la definición de preguntas con `list_questions`, exporta respuestas completas e incompletas con `export_responses` y libera la session key en un bloque `finally`. El navegador nunca se conecta a LimeSurvey. El HTML público no contiene datos: el Worker intercambia el usuario y la contraseña por un token firmado de ocho horas, que se conserva únicamente en `sessionStorage`. La opción de recordar guarda sólo el nombre de usuario.
 
 Producción:
 
@@ -204,7 +204,7 @@ Las variables que empiezan por `VITE_` son públicas por diseño; nunca colocar 
 
 ## Contrato y privacidad
 
-`GET /api/dashboard?population=students`, `population=teachers` y `population=families` exigen autenticación. Solo entregan fecha de generación, ID de encuesta, agregados por escuela y los campos mínimos del seguimiento operativo. Edad y género se procesan dentro del Worker y se entregan exclusivamente como rangos y cantidades agregadas, nunca asociados a una respuesta individual. Si se omite `population`, se conserva Estudiantes como valor predeterminado. No se devuelve ID individual, domicilio, edad exacta, género individual, composición del hogar, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela continúan contando en el total general.
+`GET /api/dashboard?population=students`, `population=teachers` y `population=families` exigen autenticación. Solo entregan fecha de generación, ID de encuesta, agregados por escuela y los campos mínimos del seguimiento operativo. Cada fila de Monitoreo de carga incluye el porcentaje de preguntas obligatorias respondidas, la cantidad respondida y la cantidad pendiente. El denominador se calcula por respuesta: cuenta las preguntas marcadas como obligatorias (`mandatory=Y`) cuya lógica de relevancia indicaba que debían mostrarse; no incluye preguntas opcionales ni obligatorias de ramas que no correspondían. Edad, género y las respuestas usadas para este cálculo se procesan dentro del Worker y no se publican individualmente. Si se omite `population`, se conserva Estudiantes como valor predeterminado. No se devuelve ID individual, domicilio, edad exacta, género individual, composición del hogar, respuestas abiertas, credenciales ni session key. Las respuestas sin escuela continúan contando en el total general.
 
 El mapa conserva los puntos de matrícula en sus coordenadas informadas y muestra únicamente establecimientos con encuestas aplicadas y ubicación institucional comprobada. Cada escuela se representa con un ícono de edificio; los hilos relacionan la matrícula con su escuela y el mapa de calor transforma los puntos de matrícula visibles.
 

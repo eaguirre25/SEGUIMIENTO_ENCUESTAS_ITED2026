@@ -1,4 +1,4 @@
-import type { RawResponse } from "./types";
+import type { RawResponse, SurveyQuestionDefinition } from "./types";
 
 interface RpcEnvelope<T> {
   id: number;
@@ -63,6 +63,73 @@ export class LimeSurveyClient {
     }
   }
 
+  async exportResponsesWithQuestions(surveyId: number): Promise<{
+    responses: RawResponse[];
+    questions: SurveyQuestionDefinition[];
+  }> {
+    let sessionKey: string | null = null;
+    try {
+      const sessionResult = await this.call<unknown>("get_session_key", [this.username, this.password]);
+      if (typeof sessionResult !== "string" || !sessionResult || sessionResult.startsWith("Error")) {
+        throw new Error(`No se pudo iniciar sesión en LimeSurvey: ${rpcStatus(sessionResult)}`);
+      }
+      sessionKey = sessionResult;
+      const questionResult = await this.call<unknown>("list_questions", [sessionKey, surveyId, null, null]);
+      const exportResult = await this.call<unknown>("export_responses", [
+        sessionKey, surveyId, "json", null, "all", "code", "long", null, null, null,
+      ]);
+      if (typeof exportResult !== "string") {
+        throw new Error(`LimeSurvey no pudo exportar respuestas: ${rpcStatus(exportResult)}`);
+      }
+      return {
+        responses: decodeExport(exportResult),
+        questions: decodeQuestions(questionResult, surveyId),
+      };
+    } finally {
+      if (sessionKey) {
+        try {
+          await this.call("release_session_key", [sessionKey]);
+        } catch (error) {
+          console.error("No se pudo liberar la sesión de LimeSurvey", error);
+        }
+      }
+    }
+  }
+
+}
+
+export function decodeQuestions(value: unknown, surveyId: number): SurveyQuestionDefinition[] {
+  const rows = Array.isArray(value)
+    ? value
+    : isPlainRecord(value)
+      ? Object.values(value)
+      : [];
+  return rows.flatMap((row) => {
+    if (!isPlainRecord(row)) return [];
+    const code = String(row.title ?? row.code ?? "").trim();
+    const qid = String(row.qid ?? "").trim();
+    if (!code || !qid) return [];
+    const mandatory = String(row.mandatory ?? "N").toUpperCase();
+    return [{
+      qid,
+      gid: String(row.gid ?? "").trim(),
+      sid: String(row.sid ?? surveyId).trim(),
+      parentQid: normalizeParentQid(row.parent_qid),
+      code,
+      type: String(row.type ?? "").trim(),
+      mandatory: mandatory === "Y" || mandatory === "S" ? mandatory : "N",
+      relevance: String(row.relevance ?? "1").trim() || "1",
+    }];
+  });
+}
+
+function normalizeParentQid(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  return !text || text === "0" ? null : text;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function rpcStatus(value: unknown): string {

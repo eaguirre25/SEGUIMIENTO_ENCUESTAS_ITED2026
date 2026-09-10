@@ -51,5 +51,9 @@ export interface DashboardPayload {
     courseYear: number | null;
     inSanMartin: boolean | null;
     complete: boolean;
+    answeredRequiredQuestions: number | null;
+    requiredQuestions: number | null;
+    missingRequiredQuestions: number | null;
+    requiredCompletionPct: number | null;
   }>;
 }

@@ -26,6 +26,10 @@ export function canonicalizePayload(payload: DashboardPayload): DashboardPayload
         resolvedSchool: identity.school,
         classificationMethod: row.classificationMethod ?? "direct",
         managementType: identity.managementType,
+        answeredRequiredQuestions: row.answeredRequiredQuestions ?? null,
+        requiredQuestions: row.requiredQuestions ?? null,
+        missingRequiredQuestions: row.missingRequiredQuestions ?? null,
+        requiredCompletionPct: row.requiredCompletionPct ?? null,
       };
     }),
   };

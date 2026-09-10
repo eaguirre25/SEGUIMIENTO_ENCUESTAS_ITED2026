@@ -42,7 +42,7 @@ const selectedSchoolIds = new Set<string>();
 type Population = "students" | "teachers" | "families";
 type DashboardView = "tracking" | "map" | "monitoring";
 type MonitoringRow = DashboardPayload["monitoringRows"][number];
-type MonitoringSortKey = "date" | "time" | "school" | "schoolIdentifier" | "resolvedSchool" | "role" | "managementType" | "courseYear" | "inSanMartin" | "complete";
+type MonitoringSortKey = "date" | "time" | "school" | "schoolIdentifier" | "resolvedSchool" | "role" | "managementType" | "courseYear" | "inSanMartin" | "complete" | "requiredCompletionPct";
 
 const POPULATION_LABELS: Record<Population, string> = {
   students: "ESTUDIANTES",
@@ -492,10 +492,10 @@ function renderMonitoring(): void {
   const teacherGrid = activePopulation === "teachers";
   const familyGrid = activePopulation === "families";
   const headers = teacherGrid
-    ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Rol", "role")}${sortHeader("Escuela con mayor carga horaria", "resolvedSchool")}${sortHeader("Encuesta completa o incompleta", "complete")}`
+    ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Rol", "role")}${sortHeader("Escuela con mayor carga horaria", "resolvedSchool")}${sortHeader("Preguntas obligatorias", "requiredCompletionPct")}${sortHeader("Encuesta completa o incompleta", "complete")}`
     : familyGrid
-      ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Vínculo", "role")}${sortHeader("Escuela oficial", "resolvedSchool")}${sortHeader("General San Martín", "inSanMartin")}${sortHeader("Año", "courseYear")}${sortHeader("Encuesta completa", "complete")}`
-    : `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Escuela asignada", "resolvedSchool")}${sortHeader("Respuesta recibida", "school")}${sortHeader("ID escuela", "schoolIdentifier")}${sortHeader("Gestión", "managementType")}${sortHeader("Año", "courseYear")}${sortHeader("Encuesta completa", "complete")}`;
+      ? `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Vínculo", "role")}${sortHeader("Escuela oficial", "resolvedSchool")}${sortHeader("General San Martín", "inSanMartin")}${sortHeader("Año", "courseYear")}${sortHeader("Preguntas obligatorias", "requiredCompletionPct")}${sortHeader("Encuesta completa", "complete")}`
+    : `${sortHeader("Fecha", "date")}${sortHeader("Hora", "time")}${sortHeader("Escuela asignada", "resolvedSchool")}${sortHeader("Respuesta recibida", "school")}${sortHeader("ID escuela", "schoolIdentifier")}${sortHeader("Gestión", "managementType")}${sortHeader("Año", "courseYear")}${sortHeader("Preguntas obligatorias", "requiredCompletionPct")}${sortHeader("Encuesta completa", "complete")}`;
   view.innerHTML = `
     <section class="monitoring-panel panel">
       <div class="monitoring-heading section-heading">
@@ -506,14 +506,17 @@ function renderMonitoring(): void {
         <thead><tr>${headers}</tr></thead>
         <tbody>${rows.map((row) => teacherGrid ? `<tr>
           <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.role || "Sin informar")}</td><td>${escapeHtml(monitoringResolvedName(row))}</td>
+          ${requiredProgressCell(row)}
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "COMPLETA" : "INCOMPLETA"}</span></td>
         </tr>` : familyGrid ? `<tr>
           <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td>${escapeHtml(row.role || "Sin informar")}</td><td>${escapeHtml(monitoringResolvedName(row))}</td>
           <td>${row.inSanMartin === null ? "Sin informar" : row.inSanMartin ? "Sí" : "No"}</td><td>${row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`}</td>
+          ${requiredProgressCell(row)}
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "SI" : "NO"}</span></td>
         </tr>` : `<tr>
           <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td><strong>${escapeHtml(monitoringResolvedName(row))}</strong>${row.classificationMethod === "time_window" ? "<small>Inferida por fecha y horario</small>" : row.classificationMethod === "requires_review" ? `<small>${row.reviewReason === "conflict" ? "ID y respuesta contradictorios" : "Sin datos suficientes"}</small>` : ""}</td><td>${escapeHtml(row.school)}</td><td>${escapeHtml(row.schoolIdentifier)}</td>
           <td><span class="management-badge ${row.managementType}">${managementLabel(row.managementType)}</span></td><td>${row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`}</td>
+          ${requiredProgressCell(row)}
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "SI" : "NO"}</span></td>
         </tr>`).join("")}</tbody>
       </table></div>` : `<div class="monitoring-empty"><strong>Sin cargas registradas</strong><p>Los resultados de ${POPULATION_LABELS[activePopulation].toLocaleLowerCase("es-AR")} se mostrarán aquí cuando la encuesta esté conectada.</p></div>`}
@@ -712,6 +715,13 @@ function initializeFilters(): void {
 
 function schoolDisplayName(school: SchoolSummary): string {
   return officialSchoolName(school);
+}
+
+function requiredProgressCell(row: MonitoringRow): string {
+  if (row.requiredCompletionPct === null || row.requiredQuestions === null || row.answeredRequiredQuestions === null || row.missingRequiredQuestions === null) {
+    return `<td class="required-progress"><span>—</span><small>No disponible</small></td>`;
+  }
+  return `<td class="required-progress"><strong>${formatPct(row.requiredCompletionPct)}</strong><small>${row.answeredRequiredQuestions} de ${row.requiredQuestions} · ${row.missingRequiredQuestions} sin responder</small></td>`;
 }
 
 function monitoringResolvedName(row: MonitoringRow): string {

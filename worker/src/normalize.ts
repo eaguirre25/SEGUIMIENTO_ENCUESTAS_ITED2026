@@ -14,12 +14,14 @@ import type {
   DashboardPayload,
   DemographicSummary,
   LoadMonitoringRow,
+  SurveyQuestionDefinition,
   ManagementType,
   NormalizedResponse,
   RawResponse,
   RoleCounts,
   SchoolSummary,
 } from "./types";
+import { calculateRequiredProgress } from "./required-progress";
 
 type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL" | "ROLE" | "ROLE_OTHER" | "IN_SAN_MARTIN" | "AGE" | "GENDER" | "EXTERNAL_SCHOOL";
 export type QuestionMap = Omit<Record<keyof typeof QUESTION_MAP, string | readonly string[] | null>, OptionalSchoolBranch>
@@ -313,6 +315,7 @@ export function buildDashboard(
   map: QuestionMap = QUESTION_MAP,
   generatedAt = new Date().toISOString(),
   excludedResponseKeys: ReadonlySet<string> = LEGACY_EXCLUDED_TEST_RESPONSE_KEYS,
+  requiredQuestions: readonly SurveyQuestionDefinition[] = [],
 ): DashboardPayload {
   const includedResponses = rawResponses.filter((raw) => !isExcludedTestResponse(raw, map, excludedResponseKeys));
   const classified = includedResponses.map((raw) => ({ raw, item: normalizeResponse(raw, map) }));
@@ -393,7 +396,7 @@ export function buildDashboard(
       }];
     }),
     monitoringRows: classified
-      .map(({ raw, item }) => toMonitoringRow(raw, map, item))
+      .map(({ raw, item }) => toMonitoringRow(raw, map, item, requiredQuestions))
       .sort((left, right) => `${right.date} ${right.time}`.localeCompare(`${left.date} ${left.time}`)),
   };
 }
@@ -418,9 +421,15 @@ export function firstTeacherSchoolMention(value: unknown): unknown {
   return clean.split(/\s*(?:\r?\n|;|,|\s+\/\s+|\s+-\s+|\s+(?:y|e)\s+)\s*/i).find(Boolean) ?? clean;
 }
 
-function toMonitoringRow(raw: RawResponse, map: QuestionMap, normalized?: NormalizedResponse | null): LoadMonitoringRow {
+function toMonitoringRow(
+  raw: RawResponse,
+  map: QuestionMap,
+  normalized?: NormalizedResponse | null,
+  requiredQuestions: readonly SurveyQuestionDefinition[] = [],
+): LoadMonitoringRow {
   const timestamp = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(raw, map.LOAD_TIMESTAMP) : null);
   const identity = normalized ?? normalizeResponse(raw, map);
+  const progress = requiredQuestions.length ? calculateRequiredProgress(raw, requiredQuestions) : null;
   return {
     date: timestamp.date,
     time: timestamp.time,
@@ -434,6 +443,10 @@ function toMonitoringRow(raw: RawResponse, map: QuestionMap, normalized?: Normal
     courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
     inSanMartin: map.IN_SAN_MARTIN ? parseYesNo(readMappedValue(raw, map.IN_SAN_MARTIN)) : null,
     complete: detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
+    answeredRequiredQuestions: progress?.answeredRequiredQuestions ?? null,
+    requiredQuestions: progress?.requiredQuestions ?? null,
+    missingRequiredQuestions: progress?.missingRequiredQuestions ?? null,
+    requiredCompletionPct: progress?.requiredCompletionPct ?? null,
   };
 }
 

@@ -13,6 +13,17 @@ export interface Env {
 
 export type RawResponse = Record<string, unknown>;
 
+export interface SurveyQuestionDefinition {
+  qid: string;
+  gid: string;
+  sid: string;
+  parentQid: string | null;
+  code: string;
+  type: string;
+  mandatory: "Y" | "S" | "N";
+  relevance: string;
+}
+
 export interface NormalizedResponse {
   school: string;
   schoolKey: string;
@@ -82,6 +93,10 @@ export interface LoadMonitoringRow {
   courseYear: number | null;
   inSanMartin: boolean | null;
   complete: boolean;
+  answeredRequiredQuestions: number | null;
+  requiredQuestions: number | null;
+  missingRequiredQuestions: number | null;
+  requiredCompletionPct: number | null;
 }
 
 export type ManagementType = "state" | "private" | "unknown";
