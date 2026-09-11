@@ -12,7 +12,7 @@ LimeSurvey Cloud
   → dashboard estático Vite + TypeScript + MapLibre + capa oficial de escuelas
 ```
 
-El Worker abre una sesión, consulta la definición de preguntas con `list_questions`, exporta respuestas completas e incompletas con `export_responses` y libera la session key en un bloque `finally`. El navegador nunca se conecta a LimeSurvey. El HTML público no contiene datos: el Worker intercambia el usuario y la contraseña por un token firmado de ocho horas, que se conserva únicamente en `sessionStorage`. La opción de recordar guarda sólo el nombre de usuario.
+El Worker abre una sesión, consulta la definición de preguntas con `list_questions` y `get_fieldmap`, exporta únicamente los campos operativos y los necesarios para calcular las preguntas obligatorias con `export_responses`, y libera la session key en un bloque `finally`. El navegador nunca se conecta a LimeSurvey. El HTML público no contiene datos: el Worker intercambia el usuario y la contraseña por un token firmado de ocho horas, que se conserva únicamente en `sessionStorage`. La opción de recordar guarda sólo el nombre de usuario.
 
 Producción:
 

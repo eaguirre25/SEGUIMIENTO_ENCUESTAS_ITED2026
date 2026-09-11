@@ -63,7 +63,7 @@ export class LimeSurveyClient {
     }
   }
 
-  async exportResponsesWithQuestions(surveyId: number): Promise<{
+  async exportResponsesWithQuestions(surveyId: number, operationalFields: readonly string[] = []): Promise<{
     responses: RawResponse[];
     questions: SurveyQuestionDefinition[];
   }> {
@@ -75,15 +75,19 @@ export class LimeSurveyClient {
       }
       sessionKey = sessionResult;
       const questionResult = await this.call<unknown>("list_questions", [sessionKey, surveyId, null, null]);
+      const questions = decodeQuestions(questionResult, surveyId);
+      const fieldMapResult = await this.call<unknown>("get_fieldmap", [sessionKey, surveyId, null]);
+      const requiredFields = selectRequiredFields(fieldMapResult, questions);
+      const exportFields = [...new Set([...operationalFields, ...requiredFields])];
       const exportResult = await this.call<unknown>("export_responses", [
-        sessionKey, surveyId, "json", null, "all", "code", "long", null, null, null,
+        sessionKey, surveyId, "json", null, "all", "code", "long", null, null, exportFields.length ? exportFields : null,
       ]);
       if (typeof exportResult !== "string") {
         throw new Error(`LimeSurvey no pudo exportar respuestas: ${rpcStatus(exportResult)}`);
       }
       return {
         responses: decodeExport(exportResult),
-        questions: decodeQuestions(questionResult, surveyId),
+        questions,
       };
     } finally {
       if (sessionKey) {
@@ -96,6 +100,26 @@ export class LimeSurveyClient {
     }
   }
 
+}
+
+export function selectRequiredFields(value: unknown, questions: readonly SurveyQuestionDefinition[]): string[] {
+  const required = questions.filter((question) => question.mandatory === "Y" && question.parentQid === null);
+  const neededQids = new Set(required.map((question) => question.qid));
+  const rootByCode = new Map(questions
+    .filter((question) => question.parentQid === null)
+    .map((question) => [question.code.toLocaleLowerCase("es-AR"), question.qid]));
+  for (const question of required) {
+    for (const token of question.relevance.match(/[\p{L}_][\p{L}\p{N}_]*/gu) ?? []) {
+      const qid = rootByCode.get(token.toLocaleLowerCase("es-AR"));
+      if (qid) neededQids.add(qid);
+    }
+  }
+  if (!isPlainRecord(value)) return [];
+  return Object.entries(value).flatMap(([key, rawField]) => {
+    if (!isPlainRecord(rawField) || !neededQids.has(String(rawField.qid ?? ""))) return [];
+    const fieldname = String(rawField.fieldname ?? key).trim();
+    return fieldname ? [fieldname] : [];
+  });
 }
 
 export function decodeQuestions(value: unknown, surveyId: number): SurveyQuestionDefinition[] {

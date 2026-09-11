@@ -134,7 +134,7 @@ async function refreshDashboard(env: Env, population: DashboardPopulation): Prom
     env.LIMESURVEY_USERNAME,
     env.LIMESURVEY_PASSWORD,
   );
-  const { responses: raw, questions } = await client.exportResponsesWithQuestions(Number(config.surveyId));
+  const { responses: raw, questions } = await client.exportResponsesWithQuestions(Number(config.surveyId), config.exportFields);
   const exclusions = await readExcludedResponseKeys(env);
   const serialized = JSON.stringify(buildDashboard(raw, config.surveyId, config.questionMap, new Date().toISOString(), exclusions, questions));
   await env.DASHBOARD_DB.prepare(`

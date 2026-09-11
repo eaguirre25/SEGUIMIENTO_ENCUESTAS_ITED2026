@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { LimeSurveyClient, decodeQuestions } from "../src/limesurvey";
+import { LimeSurveyClient, decodeQuestions, selectRequiredFields } from "../src/limesurvey";
 import { calculateRequiredProgress, isQuestionApplicable } from "../src/required-progress";
 import type { SurveyQuestionDefinition } from "../src/types";
 
@@ -58,6 +58,20 @@ describe("avance de preguntas obligatorias", () => {
     ]);
   });
 
+  it("selecciona sólo campos obligatorios y los necesarios para su relevancia", () => {
+    const questions = [
+      question({ qid: "1", code: "ROL", mandatory: "N" }),
+      question({ qid: "2", code: "DETALLE", relevance: "ROL.NAOK == 'Docente'" }),
+      question({ qid: "3", code: "OPCIONAL", mandatory: "N" }),
+    ];
+    const fields = selectRequiredFields({
+      Q1: { fieldname: "Q1", qid: "1" },
+      Q2: { fieldname: "Q2", qid: "2" },
+      Q3: { fieldname: "Q3", qid: "3" },
+    }, questions);
+    expect(fields).toEqual(["Q1", "Q2"]);
+  });
+
   it("obtiene preguntas y respuestas en una sola sesión y exporta todos los campos", async () => {
     const calls: Array<{ method: string; params: unknown[] }> = [];
     vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => {
@@ -67,17 +81,19 @@ describe("avance de preguntas obligatorias", () => {
         ? "session-key"
         : request.method === "list_questions"
           ? [{ qid: 1, gid: 10, sid: 977929, title: "Q1", type: "L", mandatory: "Y", relevance: "1" }]
+          : request.method === "get_fieldmap"
+            ? { Q1: { fieldname: "Q1", qid: 1 } }
           : request.method === "export_responses"
             ? btoa(JSON.stringify({ responses: [{ Q1: "Yes" }] }))
             : "OK";
       return Response.json({ id: request.id, result });
     }));
     try {
-      const result = await new LimeSurveyClient("https://example.invalid/rpc", "user", "password").exportResponsesWithQuestions(977929);
+      const result = await new LimeSurveyClient("https://example.invalid/rpc", "user", "password").exportResponsesWithQuestions(977929, ["submitdate"]);
       expect(result.responses).toEqual([{ Q1: "Yes" }]);
       expect(result.questions).toHaveLength(1);
-      expect(calls.map(({ method }) => method)).toEqual(["get_session_key", "list_questions", "export_responses", "release_session_key"]);
-      expect(calls[2].params[9]).toBeNull();
+      expect(calls.map(({ method }) => method)).toEqual(["get_session_key", "list_questions", "get_fieldmap", "export_responses", "release_session_key"]);
+      expect(calls[3].params[9]).toEqual(["submitdate", "Q1"]);
     } finally {
       vi.unstubAllGlobals();
     }
