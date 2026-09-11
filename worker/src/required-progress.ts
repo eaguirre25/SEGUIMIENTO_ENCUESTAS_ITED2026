@@ -10,14 +10,21 @@ export interface RequiredProgress {
 const MULTIPLE_ANY_TYPES = new Set(["M", "P", "R"]);
 const MULTIPLE_ALL_TYPES = new Set(["1", "A", "B", "C", "E", "F", "H", "K", "Q", ":", ";"]);
 const SYSTEM_FIELDS = new Set(["id", "token", "submitdate", "lastpage", "startlanguage", "seed", "startdate", "datestamp", "ipaddr", "refurl"]);
+const requiredQuestionCache = new WeakMap<object, SurveyQuestionDefinition[]>();
+const relevanceTokenCache = new Map<string, Token[]>();
 
 export function calculateRequiredProgress(
   raw: RawResponse,
   questions: readonly SurveyQuestionDefinition[],
 ): RequiredProgress {
-  const required = questions.filter((question) => question.mandatory === "Y" && question.parentQid === null);
+  let required = requiredQuestionCache.get(questions as object);
+  if (!required) {
+    required = questions.filter((question) => question.mandatory === "Y" && question.parentQid === null);
+    requiredQuestionCache.set(questions as object, required);
+  }
+  const indexedValues = indexQuestionValues(raw, required);
   const applicable = required.filter((question) => isQuestionApplicable(question.relevance, raw));
-  const answered = applicable.filter((question) => isQuestionAnswered(question, raw)).length;
+  const answered = applicable.filter((question) => isQuestionAnswered(question, raw, indexedValues.get(question.code))).length;
   return {
     answeredRequiredQuestions: answered,
     requiredQuestions: applicable.length,
@@ -26,12 +33,34 @@ export function calculateRequiredProgress(
   };
 }
 
-export function isQuestionAnswered(question: SurveyQuestionDefinition, raw: RawResponse): boolean {
-  const values = matchingValues(question, raw);
+export function isQuestionAnswered(question: SurveyQuestionDefinition, raw: RawResponse, indexed?: unknown[]): boolean {
+  const values = indexed?.length ? indexed : matchingValues(question, raw);
   if (!values.length) return false;
   if (MULTIPLE_ANY_TYPES.has(question.type)) return values.some(isSelectedValue);
   if (MULTIPLE_ALL_TYPES.has(question.type)) return values.every(isAnsweredValue);
   return isAnsweredValue(values[0]);
+}
+
+function indexQuestionValues(raw: RawResponse, questions: readonly SurveyQuestionDefinition[]): Map<string, unknown[]> {
+  const aliases = new Map<string, string>();
+  for (const question of questions) {
+    aliases.set(question.code, question.code);
+    if (question.sid && question.gid) aliases.set(`${question.sid}X${question.gid}X${question.qid}`, question.code);
+  }
+  const result = new Map<string, unknown[]>();
+  for (const [key, value] of Object.entries(raw)) {
+    if (SYSTEM_FIELDS.has(key.toLocaleLowerCase("en"))) continue;
+    let code = aliases.get(key);
+    if (!code) {
+      const boundary = key.search(/[\s.:[\]#-]/);
+      if (boundary > 0) code = aliases.get(key.slice(0, boundary));
+    }
+    if (!code) continue;
+    const values = result.get(code) ?? [];
+    values.push(value);
+    result.set(code, values);
+  }
+  return result;
 }
 
 function matchingValues(question: SurveyQuestionDefinition, raw: RawResponse): unknown[] {
@@ -63,7 +92,11 @@ export function isQuestionApplicable(relevance: string, raw: RawResponse): boole
   if (!expression || expression === "1") return true;
   if (expression === "0") return false;
   try {
-    const tokens = tokenize(expression);
+    let tokens = relevanceTokenCache.get(expression);
+    if (!tokens) {
+      tokens = tokenize(expression);
+      relevanceTokenCache.set(expression, tokens);
+    }
     const parser = new RelevanceParser(tokens, raw);
     const result = parser.parse();
     return parser.atEnd() ? truthy(result) : true;

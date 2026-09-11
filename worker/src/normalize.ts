@@ -316,9 +316,18 @@ export function buildDashboard(
   generatedAt = new Date().toISOString(),
   excludedResponseKeys: ReadonlySet<string> = LEGACY_EXCLUDED_TEST_RESPONSE_KEYS,
   requiredQuestions: readonly SurveyQuestionDefinition[] = [],
+  progressResponses: readonly RawResponse[] = rawResponses,
 ): DashboardPayload {
+  const progressById = new Map(progressResponses.flatMap((raw) => raw.id === null || raw.id === undefined ? [] : [[String(raw.id), raw] as const]));
   const includedResponses = rawResponses.filter((raw) => !isExcludedTestResponse(raw, map, excludedResponseKeys));
-  const classified = includedResponses.map((raw) => ({ raw, item: normalizeResponse(raw, map) }));
+  const classified = includedResponses.map((raw, index) => {
+    const responseId = raw.id === null || raw.id === undefined ? null : String(raw.id);
+    return {
+      raw,
+      progressRaw: (responseId ? progressById.get(responseId) : null) ?? progressResponses[index] ?? raw,
+      item: normalizeResponse(raw, map),
+    };
+  });
   applyTemporalSchoolInference(classified, map);
   const normalized = classified.flatMap(({ item }) => item ? [item] : []);
   const summary = emptyCounts();
@@ -396,7 +405,7 @@ export function buildDashboard(
       }];
     }),
     monitoringRows: classified
-      .map(({ raw, item }) => toMonitoringRow(raw, map, item, requiredQuestions))
+      .map(({ raw, progressRaw, item }) => toMonitoringRow(raw, map, item, requiredQuestions, progressRaw))
       .sort((left, right) => `${right.date} ${right.time}`.localeCompare(`${left.date} ${left.time}`)),
   };
 }
@@ -426,10 +435,11 @@ function toMonitoringRow(
   map: QuestionMap,
   normalized?: NormalizedResponse | null,
   requiredQuestions: readonly SurveyQuestionDefinition[] = [],
+  progressRaw: RawResponse = raw,
 ): LoadMonitoringRow {
   const timestamp = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(raw, map.LOAD_TIMESTAMP) : null);
   const identity = normalized ?? normalizeResponse(raw, map);
-  const progress = requiredQuestions.length ? calculateRequiredProgress(raw, requiredQuestions) : null;
+  const progress = requiredQuestions.length ? calculateRequiredProgress(progressRaw, requiredQuestions) : null;
   return {
     date: timestamp.date,
     time: timestamp.time,

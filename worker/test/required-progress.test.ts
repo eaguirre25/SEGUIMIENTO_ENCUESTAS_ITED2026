@@ -84,16 +84,20 @@ describe("avance de preguntas obligatorias", () => {
           : request.method === "get_fieldmap"
             ? { Q1: { fieldname: "Q1", qid: 1 } }
           : request.method === "export_responses"
-            ? btoa(JSON.stringify({ responses: [{ Q1: "Yes" }] }))
+            ? btoa(JSON.stringify({ responses: [{ id: 1, Q1: request.params[6] === "short" ? "Y" : "Yes" }] }))
             : "OK";
       return Response.json({ id: request.id, result });
     }));
     try {
       const result = await new LimeSurveyClient("https://example.invalid/rpc", "user", "password").exportResponsesWithQuestions(977929, ["submitdate"]);
-      expect(result.responses).toEqual([{ Q1: "Yes" }]);
+      expect(result.responses).toEqual([{ id: 1, Q1: "Yes" }]);
+      expect(result.progressResponses).toEqual([{ id: 1, Q1: "Y" }]);
       expect(result.questions).toHaveLength(1);
-      expect(calls.map(({ method }) => method)).toEqual(["get_session_key", "list_questions", "get_fieldmap", "export_responses", "release_session_key"]);
-      expect(calls[3].params[9]).toEqual(["submitdate", "Q1"]);
+      expect(calls.map(({ method }) => method)).toEqual(["get_session_key", "list_questions", "get_fieldmap", "export_responses", "export_responses", "release_session_key"]);
+      expect(calls[3].params[6]).toBe("long");
+      expect(calls[3].params[9]).toEqual(["id", "submitdate"]);
+      expect(calls[4].params[6]).toBe("short");
+      expect(calls[4].params[9]).toEqual(["id", "Q1"]);
     } finally {
       vi.unstubAllGlobals();
     }

@@ -86,7 +86,9 @@ export default {
       const url = new URL("/api/dashboard", env.DASHBOARD_SELF_URL);
       url.searchParams.set("population", population);
       url.searchParams.set("refresh", "1");
-      ctx.waitUntil(fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(async (response) => {
+      const request = new Request(url, { headers: { Authorization: `Bearer ${token}` } });
+      const refreshRequest = env.DASHBOARD_SELF ? env.DASHBOARD_SELF.fetch(request) : fetch(request);
+      ctx.waitUntil(refreshRequest.then(async (response) => {
         await response.body?.cancel();
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         console.log(JSON.stringify({ message: "dashboard cache refreshed", population }));
@@ -141,9 +143,9 @@ async function refreshDashboard(env: Env, population: DashboardPopulation): Prom
     env.LIMESURVEY_USERNAME,
     env.LIMESURVEY_PASSWORD,
   );
-  const { responses: raw, questions } = await client.exportResponsesWithQuestions(Number(config.surveyId), config.exportFields);
+  const { responses: raw, progressResponses, questions } = await client.exportResponsesWithQuestions(Number(config.surveyId), config.exportFields);
   const exclusions = await readExcludedResponseKeys(env);
-  const serialized = JSON.stringify(buildDashboard(raw, config.surveyId, config.questionMap, new Date().toISOString(), exclusions, questions));
+  const serialized = JSON.stringify(buildDashboard(raw, config.surveyId, config.questionMap, new Date().toISOString(), exclusions, questions, progressResponses));
   await env.DASHBOARD_DB.prepare(`
     INSERT INTO dashboard_population_cache (population, payload, updated_at)
     VALUES (?1, ?2, datetime('now'))

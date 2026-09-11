@@ -15,6 +15,12 @@
   "env": {
     "production": {
       "name": "limesurvey-dashboard-api-production",
+      "services": [
+        {
+          "binding": "DASHBOARD_SELF",
+          "service": "limesurvey-dashboard-api-production"
+        }
+      ],
       "d1_databases": [
         {
           "binding": "DASHBOARD_DB",

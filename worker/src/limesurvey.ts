@@ -65,6 +65,7 @@ export class LimeSurveyClient {
 
   async exportResponsesWithQuestions(surveyId: number, operationalFields: readonly string[] = []): Promise<{
     responses: RawResponse[];
+    progressResponses: RawResponse[];
     questions: SurveyQuestionDefinition[];
   }> {
     let sessionKey: string | null = null;
@@ -78,15 +79,20 @@ export class LimeSurveyClient {
       const questions = decodeQuestions(questionResult, surveyId);
       const fieldMapResult = await this.call<unknown>("get_fieldmap", [sessionKey, surveyId, null]);
       const requiredFields = selectRequiredFields(fieldMapResult, questions);
-      const exportFields = [...new Set([...operationalFields, ...requiredFields])];
-      const exportResult = await this.call<unknown>("export_responses", [
-        sessionKey, surveyId, "json", null, "all", "code", "long", null, null, exportFields.length ? exportFields : null,
+      const dashboardFields = [...new Set(["id", ...operationalFields])];
+      const progressFields = [...new Set(["id", ...requiredFields])];
+      const dashboardExport = await this.call<unknown>("export_responses", [
+        sessionKey, surveyId, "json", null, "all", "code", "long", null, null, dashboardFields,
       ]);
-      if (typeof exportResult !== "string") {
-        throw new Error(`LimeSurvey no pudo exportar respuestas: ${rpcStatus(exportResult)}`);
+      const progressExport = await this.call<unknown>("export_responses", [
+        sessionKey, surveyId, "json", null, "all", "code", "short", null, null, progressFields,
+      ]);
+      if (typeof dashboardExport !== "string" || typeof progressExport !== "string") {
+        throw new Error(`LimeSurvey no pudo exportar respuestas: ${rpcStatus(typeof dashboardExport !== "string" ? dashboardExport : progressExport)}`);
       }
       return {
-        responses: decodeExport(exportResult),
+        responses: decodeExport(dashboardExport),
+        progressResponses: decodeExport(progressExport),
         questions,
       };
     } finally {

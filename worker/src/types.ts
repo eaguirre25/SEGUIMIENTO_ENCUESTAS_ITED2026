@@ -7,6 +7,7 @@ export interface Env {
   LIMESURVEY_FAMILY_SURVEY_ID: string;
   DASHBOARD_ALLOWED_ORIGIN: string;
   DASHBOARD_SELF_URL: string;
+  DASHBOARD_SELF?: Fetcher;
   DASHBOARD_USERNAME: string;
   DASHBOARD_PASSWORD: string;
   DASHBOARD_DB: D1Database;
