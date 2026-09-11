@@ -9,7 +9,8 @@
     "LIMESURVEY_STUDENT_SURVEY_ID": "977929",
     "LIMESURVEY_TEACHER_SURVEY_ID": "985318",
     "LIMESURVEY_FAMILY_SURVEY_ID": "997168",
-    "DASHBOARD_ALLOWED_ORIGIN": "http://localhost:5173"
+    "DASHBOARD_ALLOWED_ORIGIN": "http://localhost:5173",
+    "DASHBOARD_SELF_URL": "http://localhost:8787"
   },
   "env": {
     "production": {
@@ -26,7 +27,8 @@
         "LIMESURVEY_STUDENT_SURVEY_ID": "977929",
         "LIMESURVEY_TEACHER_SURVEY_ID": "985318",
         "LIMESURVEY_FAMILY_SURVEY_ID": "997168",
-        "DASHBOARD_ALLOWED_ORIGIN": "https://eaguirre25.github.io"
+        "DASHBOARD_ALLOWED_ORIGIN": "https://eaguirre25.github.io",
+        "DASHBOARD_SELF_URL": "https://limesurvey-dashboard-api-production.limesurvey-dashboard-worker.workers.dev"
       }
     }
   }

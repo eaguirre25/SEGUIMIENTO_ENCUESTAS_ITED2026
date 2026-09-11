@@ -10,6 +10,7 @@ const env: Env = {
   LIMESURVEY_TEACHER_SURVEY_ID: "985318",
   LIMESURVEY_FAMILY_SURVEY_ID: "997168",
   DASHBOARD_ALLOWED_ORIGIN: "https://example.github.io",
+  DASHBOARD_SELF_URL: "https://worker.example",
   DASHBOARD_USERNAME: "viewer",
   DASHBOARD_PASSWORD: "strong-password",
   DASHBOARD_DB: {} as D1Database,

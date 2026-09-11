@@ -81,11 +81,18 @@ export default {
       }));
       return;
     }
+    const token = await createSessionToken(env);
     for (const population of ["students", "teachers", "families"] as const) {
-      ctx.waitUntil(refreshDashboard(env, population).then(
-        () => console.log(JSON.stringify({ message: "dashboard cache refreshed", population })),
-        (error) => console.error(JSON.stringify({ message: "dashboard refresh failed", population, error: errorMessage(error) })),
-      ));
+      const url = new URL("/api/dashboard", env.DASHBOARD_SELF_URL);
+      url.searchParams.set("population", population);
+      url.searchParams.set("refresh", "1");
+      ctx.waitUntil(fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(async (response) => {
+        await response.body?.cancel();
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        console.log(JSON.stringify({ message: "dashboard cache refreshed", population }));
+      }).catch((error) => {
+        console.error(JSON.stringify({ message: "dashboard refresh failed", population, error: errorMessage(error) }));
+      }));
     }
   },
 } satisfies ExportedHandler<Env>;
@@ -194,6 +201,7 @@ function assertEnv(env: Env): void {
     "LIMESURVEY_TEACHER_SURVEY_ID",
     "LIMESURVEY_FAMILY_SURVEY_ID",
     "DASHBOARD_ALLOWED_ORIGIN",
+    "DASHBOARD_SELF_URL",
     "DASHBOARD_USERNAME",
     "DASHBOARD_PASSWORD",
     "DASHBOARD_DB",

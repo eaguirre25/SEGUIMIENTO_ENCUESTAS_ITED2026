@@ -197,6 +197,7 @@ En Cloudflare Pages también puede conectarse GitHub usando `frontend` como raí
 | `LIMESURVEY_TEACHER_SURVEY_ID` | variable | `wrangler.jsonc` | `985318` |
 | `LIMESURVEY_FAMILY_SURVEY_ID` | variable | `wrangler.jsonc` | `997168` |
 | `DASHBOARD_ALLOWED_ORIGIN` | variable | `wrangler.jsonc` | origen exacto del frontend |
+| `DASHBOARD_SELF_URL` | variable | `wrangler.jsonc` | URL del Worker para separar cada actualización programada |
 | `VITE_DATA_MODE` | build frontend | `.env.local`/CI | `demo` o `api` |
 | `VITE_API_BASE_URL` | build frontend | `.env.local`/CI | URL del Worker |
 
