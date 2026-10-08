@@ -1,4 +1,4 @@
-import { EES6_NAME, EES4_NAME, EES47_NAME, EPS408_NAME, REVIEW_REQUIRED_NAME, officialStateSchoolName, schoolIdentityKey } from "../../shared/schools";
+import { EEST5_NAME, resolveStudentSchool, EES6_NAME, EES4_NAME, EES47_NAME, EPS408_NAME, REVIEW_REQUIRED_NAME, officialStateSchoolName, schoolIdentityKey } from "../../shared/schools";
 import { describe, expect, it, vi } from "vitest";
 import { buildDashboard, detectCompletion, firstTeacherSchoolMention, isCoordinateInSanMartin, normalizeGender, normalizeSchool, parseAgeGroup, parseCourseYear, parseSchoolNumber, parseYesNo, splitTimestamp } from "../src/normalize";
 import { decodeExport, LimeSurveyClient } from "../src/limesurvey";
@@ -24,6 +24,57 @@ const map: QuestionMap = {
 };
 
 describe("normalización", () => {
+  it("distingue Galileo Galilei de la EES 5 en nombres e identificadores", () => {
+    for (const variant of ["EEST 5", "E.E.S.T. Nro 5", "EET5", "Técnica 5", "Galileo", "Galilei", "Galilei Galilei", EEST5_NAME]) {
+      expect(normalizeSchool(variant)?.original).toBe(EEST5_NAME);
+      expect(resolveStudentSchool(variant, "5").identity.school).toBe(EEST5_NAME);
+      expect(resolveStudentSchool(null, variant).identity.school).toBe(EEST5_NAME);
+    }
+    expect(resolveStudentSchool(null, "500").identity.school).toBe(EEST5_NAME);
+    expect(resolveStudentSchool("5", "500").identity.school).toBe(EEST5_NAME);
+    expect(resolveStudentSchool("Galilei", "500").method).toBe("id_and_name");
+    expect(resolveStudentSchool("EES 5", "5").identity.school).toBe(officialStateSchoolName(5));
+    expect(resolveStudentSchool("EES 5", "500").reviewReason).toBe("conflict");
+    expect(resolveStudentSchool("Galilei", "6").reviewReason).toBe("conflict");
+    expect(resolveStudentSchool("Instituto Galileo", null, "private").identity.managementType).toBe("private");
+  });
+
+  it("conserva totales y separa las dos escuelas 5 en estudiantes, docentes y familias", () => {
+    const studentMap = { ...map, SCHOOL_IDENTIFIER: "identifier" };
+    const result = buildDashboard([
+      { school: "Técnica 5", identifier: "500", submitdate: "2026-10-08 15:00:00" },
+      { school: "Galilei", identifier: "EEST5", submitdate: null },
+      { school: "EES 5", identifier: "5", submitdate: "2026-10-07 15:00:00" },
+    ], "test", studentMap);
+    expect(result.summary).toMatchObject({ total: 3, complete: 2, incomplete: 1 });
+    expect(result.schools).toHaveLength(2);
+    expect(result.schools.find(school => school.school === EEST5_NAME)).toMatchObject({ total: 2, complete: 1, incomplete: 1 });
+    for (const management of ["Estatal", null]) {
+      const direct = buildDashboard([{ school: "Técnica 5", management, submitdate: null }], "test", { ...map, MANAGEMENT_TYPE: "management" });
+      expect(direct.schools[0]).toMatchObject({ school: EEST5_NAME, schoolNumber: 5, managementType: "state" });
+    }
+    expect(schoolIdentityKey({ school: EEST5_NAME, schoolNumber: 5, managementType: "state" })).toBe("state:eest-5");
+  });
+
+  it("asigna el 5 numérico a la técnica solo en la jornada presencial confirmada", () => {
+    const studentMap = { ...map, SCHOOL_IDENTIFIER: "identifier" };
+    const result = buildDashboard([
+      { school: "5", identifier: "5", startdate: "2026-10-08 15:00:00", submitdate: "2026-10-08 15:10:00" },
+      { school: "", identifier: "5", startdate: "2026-10-08 17:00:00", submitdate: null },
+      { school: "5", identifier: "5", startdate: "2026-10-08 10:00:00", submitdate: null },
+      { school: "5", identifier: "5", startdate: "2026-10-07 15:00:00", submitdate: null },
+      { school: "5", identifier: "5", startdate: "2026-10-09 15:00:00", submitdate: null },
+      { school: "5", identifier: "5", startdate: "2026-10-08 20:00:00", submitdate: null },
+      { school: "EES 5 Bernardo de Monteagudo", identifier: "5", startdate: "2026-10-08 15:00:00", submitdate: null },
+      { school: "6", identifier: "5", startdate: "2026-10-08 15:00:00", submitdate: null },
+    ], "test", studentMap);
+    expect(result.summary.total).toBe(8);
+    expect(result.schools.find(school => school.school === EEST5_NAME)?.total).toBe(2);
+    expect(result.schools.find(school => school.school === officialStateSchoolName(5))?.total).toBe(5);
+    expect(result.schools.find(school => school.school === REVIEW_REQUIRED_NAME)?.total).toBe(1);
+    expect(result.monitoringRows.filter(row => row.classificationMethod === "time_window")).toHaveLength(2);
+  });
+
   it("usa la misma identidad local aunque una población no informe la gestión", () => {
     expect(schoolIdentityKey({ school: "Colegio Santa Ana", schoolNumber: null, managementType: "private" }))
       .toBe(schoolIdentityKey({ school: "Colegio Santa Ana", schoolNumber: null, managementType: "unknown" }));

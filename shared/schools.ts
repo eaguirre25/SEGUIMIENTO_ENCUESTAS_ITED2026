@@ -4,6 +4,7 @@ export const EES4_NAME = 'ESCUELA DE EDUCACIÓN SECUNDARIA Nº4 "DR. RICARDO ROJ
 export const EES6_NAME = 'ESCUELA DE EDUCACIÓN SECUNDARIA Nº6 "ALFONSINA STORNI"';
 export const EES24_NAME = "ESCUELA DE EDUCACIÓN SECUNDARIA Nº24";
 export const EES47_NAME = 'ESCUELA DE EDUCACIÓN SECUNDARIA Nº47 "OSVALDO BAYER"';
+export const EEST5_NAME = 'ESCUELA DE EDUCACIÓN SECUNDARIA TÉCNICA Nº5 "GALILEO GALILEI"';
 export const EPS408_NAME = "ESCUELA PROFESIONAL SECUNDARIA · CFP Nº408";
 export const REVIEW_REQUIRED_NAME = "Requieren revisión";
 
@@ -44,12 +45,31 @@ export function officialStateSchoolName(number: number): string {
   return `ESCUELA DE EDUCACIÓN SECUNDARIA Nº${number}`;
 }
 
+// Las técnicas tienen una numeración propia, independiente de las EES.
+export function technicalSchoolNumber(value: string): number | null {
+  const folded = foldSchoolText(value);
+  if (/\b(?:galileo|galilei)\b/.test(folded)) return 5;
+  const compact = folded.replace(/\s+/g, "");
+  if (!/^(?:eest|eet|et|tecnica|escuelatecnica|escueladeeducacion(?:secundaria)?tecnica)/.test(compact)) return null;
+  return parseSchoolNumber(value);
+}
+
+function technicalSchoolName(number: number): string {
+  return number === 5 ? EEST5_NAME : `ESCUELA DE EDUCACIÓN SECUNDARIA TÉCNICA Nº${number}`;
+}
+
+function technicalIdentity(number: number): SchoolIdentity {
+  return { school: technicalSchoolName(number), schoolNumber: number, managementType: "state" };
+}
+
 export function canonicalSchoolLabel(value: string, managementType: SchoolManagement = "unknown"): string {
   const clean = value.trim().replace(/\s+/g, " ");
   const folded = foldSchoolText(clean);
   if (!clean) return clean;
   if (clean === REVIEW_REQUIRED_NAME) return clean;
   if (managementType === "private") return clean;
+  const technicalNumber = technicalSchoolNumber(clean);
+  if (technicalNumber !== null) return technicalSchoolName(technicalNumber);
   if (/\b408\b/.test(folded) || /^eps(?:\d| |$)/.test(folded) || /^cfp(?:\d| |$)/.test(folded)
     || /\b(?:escuela )?(?:profesional secundaria|secundaria profesional)\b/.test(folded)) return EPS408_NAME;
   if (/\bosvaldo (?:bayer|valler|baller)\b/.test(folded)) return EES47_NAME;
@@ -68,6 +88,8 @@ export function canonicalSchoolIdentity(school: string, schoolNumber: number | n
   if (inSanMartin === false) return { school, schoolNumber: null, managementType: "unknown" as const, inSanMartin: false };
   if (school === REVIEW_REQUIRED_NAME) return { school, schoolNumber: null, managementType: "unknown" };
   const explicitLabel = canonicalSchoolLabel(school, managementType);
+  const technicalNumber = managementType === "private" ? null : technicalSchoolNumber(explicitLabel);
+  if (technicalNumber !== null) return technicalIdentity(technicalNumber);
   if (explicitLabel === EPS408_NAME) return { school: explicitLabel, schoolNumber: null, managementType: "state" };
   const source = managementType === "state" && schoolNumber !== null ? `EES ${schoolNumber}` : school;
   const label = canonicalSchoolLabel(source, managementType);
@@ -80,6 +102,13 @@ export function resolveStudentSchool(schoolAnswer: unknown, schoolIdentifier: un
   const identifier = candidateFromIdentifier(schoolIdentifier, managementType);
   if (name && identifier) {
     if (schoolIdentityKey(name) === schoolIdentityKey(identifier)) return { identity: preferNamedIdentity(name, identifier), method: "id_and_name" };
+    // Un número sin modalidad es compatible con el nombre técnico explícito.
+    const technical = technicalSchoolNumber(name.school) !== null ? name
+      : technicalSchoolNumber(identifier.school) !== null ? identifier : null;
+    const untypedValue = technical === name ? schoolIdentifier : schoolAnswer;
+    if (technical && /^0*5$/.test(String(untypedValue).trim()) && technical.schoolNumber === 5) {
+      return { identity: technical, method: "id_and_name" };
+    }
     return reviewResolution("conflict");
   }
   if (name) return { identity: name, method: "name_only" };
@@ -93,6 +122,8 @@ function candidateFromName(value: unknown, managementType: SchoolManagement): Sc
   if (!clean) return null;
   const label = canonicalSchoolLabel(clean, managementType);
   if (managementType === "private") return { school: label, schoolNumber: null, managementType };
+  const technicalNumber = technicalSchoolNumber(label);
+  if (technicalNumber !== null) return technicalIdentity(technicalNumber);
   if (label === EPS408_NAME) return { school: label, schoolNumber: null, managementType: "state" };
   const number = parseSchoolNumber(label);
   if (number !== null || label === EES4_NAME || label === EES6_NAME) {
@@ -106,6 +137,10 @@ function candidateFromIdentifier(value: unknown, managementType: SchoolManagemen
   if (managementType === "private" || (typeof value !== "string" && typeof value !== "number")) return null;
   const clean = String(value).trim();
   if (!clean) return null;
+  // Identificador de campo informado para Galileo Galilei por el equipo ITED.
+  if (clean === "500") return technicalIdentity(5);
+  const technicalNumber = technicalSchoolNumber(clean);
+  if (technicalNumber !== null) return technicalIdentity(technicalNumber);
   const folded = foldSchoolText(clean);
   if (/\b408\b/.test(folded) || /^eps(?:\d| |$)/.test(folded) || /^cfp(?:\d| |$)/.test(folded)) {
     return { school: EPS408_NAME, schoolNumber: null, managementType: "state" };
@@ -118,7 +153,7 @@ function candidateFromIdentifier(value: unknown, managementType: SchoolManagemen
 }
 
 function preferNamedIdentity(name: SchoolIdentity, identifier: SchoolIdentity): SchoolIdentity {
-  return name.managementType === "private" ? name : identifier;
+  return name.managementType === "private" || technicalSchoolNumber(name.school) !== null ? name : identifier;
 }
 
 function reviewResolution(reviewReason: SchoolReviewReason): StudentSchoolResolution {
@@ -133,6 +168,8 @@ export function schoolIdentityKey(school: SchoolIdentity): string {
   if (school.inSanMartin === false) return `external:${foldSchoolText(school.school)}`;
   if (school.school === REVIEW_REQUIRED_NAME) return "review-required";
   if (school.school === EPS408_NAME) return "state:eps-408";
+  const technicalNumber = school.managementType === "private" ? null : technicalSchoolNumber(school.school);
+  if (technicalNumber !== null) return `state:eest-${technicalNumber}`;
   if (school.schoolNumber !== null) return `state:${school.schoolNumber}`;
   // Docentes y Familias no siempre exportan la gestión. Para instituciones
   // locales no numeradas, el nombre canónico permite unir "private" y

@@ -1,5 +1,7 @@
 import {
   canonicalSchoolLabel,
+  EEST5_NAME,
+  technicalSchoolNumber,
   EPS408_NAME,
   REVIEW_REQUIRED_NAME,
   parseSchoolNumber,
@@ -169,8 +171,10 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
   const stateSchoolValue = map.STATE_SCHOOL ? readMappedValue(raw, map.STATE_SCHOOL) : genericSchoolValue;
   const privateSchoolValue = map.PRIVATE_SCHOOL ? readMappedValue(raw, map.PRIVATE_SCHOOL) : genericSchoolValue;
   const isStateSchool = managementType === "state";
+  const technicalNumber = managementType === "private" || inSanMartin === false ? null
+    : technicalSchoolNumber(String(isStateSchool ? stateSchoolValue ?? "" : genericSchoolValue ?? ""));
   let schoolNumber = isStateSchool ? parseStateSchoolNumber(stateSchoolValue) : null;
-  let mappedSchoolValue = isStateSchool
+  let mappedSchoolValue = technicalNumber !== null ? (isStateSchool ? stateSchoolValue : genericSchoolValue) : isStateSchool
     ? (schoolNumber === null ? stateSchoolValue : `EES ${schoolNumber}`)
     : managementType === "private" ? privateSchoolValue : genericSchoolValue;
   let school = inSanMartin === false ? normalizeExternalSchool(mappedSchoolValue) : normalizeSchool(mappedSchoolValue, managementType);
@@ -181,6 +185,10 @@ function identifySchool(raw: RawResponse, map: QuestionMap): {
     school = normalizeSchool(mappedSchoolValue, managementType);
   }
   if (!school) return null;
+  if (technicalNumber !== null) {
+    schoolNumber = technicalNumber;
+    managementType = "state";
+  }
   if (inSanMartin !== false && school.original === EPS408_NAME) {
     schoolNumber = null;
     managementType = "state";
@@ -328,6 +336,7 @@ export function buildDashboard(
       item: normalizeResponse(raw, map),
     };
   });
+  applyConfirmedTechnical5Fieldwork(classified, map);
   applyTemporalSchoolInference(classified, map);
   const normalized = classified.flatMap(({ item }) => item ? [item] : []);
   const summary = emptyCounts();
@@ -458,6 +467,33 @@ function toMonitoringRow(
     missingRequiredQuestions: progress?.missingRequiredQuestions ?? null,
     requiredCompletionPct: progress?.requiredCompletionPct ?? null,
   };
+}
+
+// Jornada presencial confirmada por el equipo ITED el 08/10/2026 a las 19:04.
+// Las respuestas numéricas 5 de esa tarde corresponden a la Técnica 5.
+function applyConfirmedTechnical5Fieldwork(
+  rows: Array<{ raw: RawResponse; item: NormalizedResponse | null }>,
+  map: QuestionMap,
+): void {
+  if (!map.SCHOOL_IDENTIFIER) return;
+  for (const row of rows) {
+    if (!row.item || schoolIdentityKey(row.item) !== "state:5") continue;
+    const { date, time } = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(row.raw, map.LOAD_TIMESTAMP) : null);
+    if (date !== "2026-10-08" || time < "12:00:00" || time > "19:04:03") continue;
+    const answers = [readSchoolBranch(row.raw, map), readMappedValue(row.raw, map.SCHOOL_IDENTIFIER)];
+    // Preserva los nombres institucionales explícitos y los conflictos.
+    const numericOnly = answers.every(value => {
+      const clean = String(value ?? "").trim();
+      return !clean || /^(?:(?:ees|es|id|s)\s*)?0*5$/i.test(clean);
+    });
+    if (!numericOnly) continue;
+    const school = normalizeSchool(EEST5_NAME, "state")!;
+    row.item.school = school.original;
+    row.item.schoolKey = school.key;
+    row.item.schoolNumber = 5;
+    row.item.managementType = "state";
+    row.item.classificationMethod = "time_window";
+  }
 }
 
 function applyTemporalSchoolInference(

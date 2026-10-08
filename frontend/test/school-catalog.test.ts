@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { EES47_NAME, EPS408_NAME } from "../../shared/schools";
+import { EEST5_NAME, EES47_NAME, EPS408_NAME } from "../../shared/schools";
 import { officialSchoolId, officialSchoolName, schoolLocation } from "../src/school-catalog";
 
 describe("catálogo oficial de escuelas", () => {
+  it("ubica la Técnica 5 aparte de Monteagudo aunque ambas tengan número 5", () => {
+    const technical = { school: "Galilei", schoolNumber: 5, managementType: "state" as const };
+    const ees = { ...technical, school: "EES 5" };
+    expect(officialSchoolName(technical)).toBe(EEST5_NAME);
+    expect(officialSchoolId(technical)).toBe("state:eest-5");
+    expect(officialSchoolId(ees)).toBe("state:5");
+    expect(schoolLocation(technical)?.address).toBe("AVDA. EVA PERÓN 4541");
+    expect(schoolLocation(technical)?.coordinates).not.toEqual(schoolLocation(ees)?.coordinates);
+  });
+
   it("mantiene separadas la EES Nº47 y la EPS/CFP Nº408 aunque compartan edificio", () => {
     const ees47 = { school: "EES 47", schoolNumber: 47, managementType: "state" as const };
     const eps408 = { school: "EPS 408", schoolNumber: null, managementType: "state" as const };

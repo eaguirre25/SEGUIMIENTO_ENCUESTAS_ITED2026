@@ -852,6 +852,27 @@
           -34.55231473619864
         ]
       }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 5,
+        "schoolCode": "eest-5",
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA TÉCNICA Nº5 \"GALILEO GALILEI\"",
+        "cue": "061154700",
+        "locality": "VILLA BONICH",
+        "address": "AVDA. EVA PERÓN 4541",
+        "locationSource": "https://mapcarta.com/es/W1180142446",
+        "addressSource": "https://galileo.edu.ar/",
+        "cueSource": "https://www.inet.edu.ar/wp-content/uploads/2023/10/Buenos-Aires_10-23.pdf"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.57272,
+          -34.56973
+        ]
+      }
     }
   ]
 }

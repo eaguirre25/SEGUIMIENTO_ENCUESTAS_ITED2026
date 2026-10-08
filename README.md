@@ -254,3 +254,11 @@ Para Familias, el seguimiento muestra fecha, hora, vínculo con el/la estudiante
 La exportación de Familias se limita a esos campos operativos y a edad/género para su agregación anónima en el Worker. No incorpora esos datos en las filas individuales, ni incorpora domicilio, composición del hogar o respuestas abiertas.
 
 Este proyecto no modifica encuestas: todas las operaciones RemoteControl implementadas son de autenticación, lectura/exportación y cierre de sesión.
+
+### Identidad de escuelas técnicas
+
+La EEST Nº5 «Galileo Galilei» usa la identidad `state:eest-5`, separada de la EES Nº5 Bernardo de Monteagudo (`state:5`). Se reconocen EEST/EET/Técnica 5, Galileo/Galilei y el identificador de campo 500 informado por el equipo ITED. Un número 5 sin modalidad es compatible con una referencia técnica explícita; un conflicto explícito entre EES 5 y una referencia técnica queda para revisión. El reprocesamiento conserva las respuestas originales y los totales.
+
+La ubicación de la técnica se incorporó a partir de [OpenStreetMap vía Mapcarta](https://mapcarta.com/es/W1180142446); la dirección se cotejó con [el sitio institucional](https://galileo.edu.ar/) y el CUE con [INET](https://www.inet.edu.ar/wp-content/uploads/2023/10/Buenos-Aires_10-23.pdf).
+
+El equipo ITED confirmó que las respuestas de estudiantes con número 5 cargadas la tarde del 08/10/2026 pertenecen a la Técnica 5. Se aplica una corrección por jornada a registros con texto numérico (5, EES 5 o ID 5), entre las 12:00 y las 19:04:03, hora de carga de LimeSurvey. Se conservan otras fechas, horarios, nombres institucionales explícitos y conflictos; el seguimiento muestra el método `time_window`.

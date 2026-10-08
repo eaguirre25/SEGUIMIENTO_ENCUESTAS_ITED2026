@@ -64,7 +64,7 @@ export function schoolLocation(school: { school: string; schoolNumber: number | 
   const identity = canonicalSchoolIdentity(school.school, school.schoolNumber, school.managementType, school.inSanMartin);
   if (identity.school === EPS408_NAME) return STATE_SCHOOLS.find((candidate) => candidate.id === "state:eps-408") ?? null;
   if (identity.managementType === "state" && identity.schoolNumber !== null) {
-    return STATE_SCHOOLS.find((candidate) => candidate.schoolNumber === identity.schoolNumber) ?? null;
+    return STATE_SCHOOLS.find((candidate) => candidate.id === schoolIdentityKey(identity)) ?? null;
   }
   if (identity.managementType === "private" || identity.managementType === "unknown") {
     const key = privateSchoolKey(identity.school);
