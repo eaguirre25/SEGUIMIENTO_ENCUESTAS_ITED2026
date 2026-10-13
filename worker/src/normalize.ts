@@ -336,8 +336,7 @@ export function buildDashboard(
       item: normalizeResponse(raw, map),
     };
   });
-  applyConfirmedTechnical5Fieldwork(classified, map);
-  applyConfirmedTechnical4Fieldwork(classified, map);
+  applyConfirmedTechnicalFieldwork(classified, map);
   applyTemporalSchoolInference(classified, map);
   const normalized = classified.flatMap(({ item }) => item ? [item] : []);
   const summary = emptyCounts();
@@ -470,56 +469,25 @@ function toMonitoringRow(
   };
 }
 
-// Jornada presencial confirmada por el equipo ITED el 08/10/2026 a las 19:04.
-// Las respuestas numéricas 5 de esa tarde corresponden a la Técnica 5.
-function applyConfirmedTechnical5Fieldwork(
+// Jornadas presenciales confirmadas por ITED: 08/10 Técnica 5, 09/10 Técnica 4.
+// Todas las respuestas estudiantiles de esas fechas pertenecen a esas escuelas.
+function applyConfirmedTechnicalFieldwork(
   rows: Array<{ raw: RawResponse; item: NormalizedResponse | null }>,
   map: QuestionMap,
 ): void {
   if (!map.SCHOOL_IDENTIFIER) return;
   for (const row of rows) {
-    if (!row.item || schoolIdentityKey(row.item) !== "state:5") continue;
-    const { date, time } = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(row.raw, map.LOAD_TIMESTAMP) : null);
-    if (date !== "2026-10-08" || time < "12:00:00" || time > "19:04:03") continue;
-    const answers = [readSchoolBranch(row.raw, map), readMappedValue(row.raw, map.SCHOOL_IDENTIFIER)];
-    // Preserva los nombres institucionales explícitos y los conflictos.
-    const numericOnly = answers.every(value => {
-      const clean = String(value ?? "").trim();
-      return !clean || /^(?:(?:ees|es|id|s)\s*)?0*5$/i.test(clean);
-    });
-    if (!numericOnly) continue;
-    const school = normalizeSchool(EEST5_NAME, "state")!;
-    row.item.school = school.original;
-    row.item.schoolKey = school.key;
-    row.item.schoolNumber = 5;
-    row.item.managementType = "state";
-    row.item.classificationMethod = "time_window";
-  }
-}
-
-// Jornada presencial confirmada por el equipo ITED el 09/10/2026.
-// Solo reasigna respuestas numéricas ambiguas del día; preserva escuelas explícitas.
-function applyConfirmedTechnical4Fieldwork(
-  rows: Array<{ raw: RawResponse; item: NormalizedResponse | null }>,
-  map: QuestionMap,
-): void {
-  if (!map.SCHOOL_IDENTIFIER) return;
-  for (const row of rows) {
-    if (!row.item || schoolIdentityKey(row.item) !== "state:4") continue;
+    if (!row.item) continue;
     const { date } = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(row.raw, map.LOAD_TIMESTAMP) : null);
-    if (date !== "2026-10-09") continue;
-    const answers = [readSchoolBranch(row.raw, map), readMappedValue(row.raw, map.SCHOOL_IDENTIFIER)];
-    const numericOnly = answers.every(value => {
-      const clean = String(value ?? "").trim();
-      return !clean || /^(?:(?:ees|es|id|s)\\s*)?0*4$/i.test(clean);
-    });
-    if (!numericOnly) continue;
-    const school = normalizeSchool("EEST 4", "state")!;
+    const number = date === "2026-10-08" ? 5 : date === "2026-10-09" ? 4 : null;
+    if (number === null) continue;
+    const school = normalizeSchool(number === 5 ? EEST5_NAME : "EEST 4", "state")!;
     row.item.school = school.original;
     row.item.schoolKey = school.key;
-    row.item.schoolNumber = 4;
+    row.item.schoolNumber = number;
     row.item.managementType = "state";
     row.item.classificationMethod = "time_window";
+    delete row.item.reviewReason;
   }
 }
 
