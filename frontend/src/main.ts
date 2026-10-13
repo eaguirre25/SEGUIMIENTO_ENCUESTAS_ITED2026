@@ -29,6 +29,7 @@ let activeSection: "panorama" | "population" = "panorama";
 let activeDashboardView: DashboardView = "tracking";
 let lastSuccessfulFetch = 0;
 let warning = "";
+let refreshInProgress = false;
 let maplibreModule: typeof import("maplibre-gl") | null = null;
 let map: MapLibreMap | null = null;
 let mapLoaded = false;
@@ -78,9 +79,9 @@ app.innerHTML = `
     <span id="population-title">Vista</span>
     <div class="population-switcher" role="group" aria-label="Población de la encuesta">
       <button id="panorama-button" class="population-button active" type="button">Panorama general</button>
-      <button class="population-button" data-population="students" type="button">Estudiantes <b id="students-count">0</b></button>
-      <button class="population-button" data-population="teachers" type="button">Docentes <b id="teachers-count">0</b></button>
-      <button class="population-button" data-population="families" type="button">Familias <b id="families-count">0</b></button>
+      <button class="population-button" data-population="students" type="button">Estudiantes <b id="students-count">—</b></button>
+      <button class="population-button" data-population="teachers" type="button">Docentes <b id="teachers-count">—</b></button>
+      <button class="population-button" data-population="families" type="button">Familias <b id="families-count">—</b></button>
     </div>
   </section>
   <nav id="population-tabs" class="tabs hidden" aria-label="Vistas del panel">
@@ -146,26 +147,34 @@ setInterval(() => void refresh(), REFRESH_MS);
 setInterval(updateSyncLabel, 1_000);
 
 async function refresh(): Promise<void> {
+  if (refreshInProgress) return;
   if (DATA_MODE !== "demo" && !authHeader) {
     showLogin();
     return;
   }
+  refreshInProgress = true;
   try {
-    const [studentRaw, teacherRaw, familyRaw] = DATA_MODE === "demo"
-      ? [demoPayload(), emptyPayload(), emptyPayload()]
-      : await Promise.all([fetchApi("students"), fetchApi("teachers"), fetchApi("families")]);
-    const students = canonicalizePayload(studentRaw);
-    const teachers = canonicalizePayload(teacherRaw);
-    const families = canonicalizePayload(familyRaw);
-    validatePayload(students);
-    validatePayload(teachers);
-    validatePayload(families);
-    studentData = students;
-    teacherData = teachers;
-    familyData = families;
+    const failures: string[] = [];
+    for (const population of ["students", "teachers", "families"] as const) {
+      try {
+        const raw = DATA_MODE === "demo"
+          ? (population === "students" ? demoPayload() : emptyPayload())
+          : await fetchApi(population);
+        const payload = canonicalizePayload(raw);
+        validatePayload(payload);
+        if (population === "students") studentData = payload;
+        else if (population === "teachers") teacherData = payload;
+        else familyData = payload;
+        lastSuccessfulFetch = Date.now();
+        data = payloadForPopulation(activePopulation);
+        render();
+      } catch (error) {
+        if (error instanceof AuthenticationError) throw error;
+        failures.push(`${POPULATION_LABELS[population]}: ${error instanceof Error ? error.message : "sin respuesta"}`);
+      }
+    }
     data = payloadForPopulation(activePopulation);
-    lastSuccessfulFetch = Date.now();
-    warning = "";
+    warning = failures.join(" · ");
     hideLogin();
     render();
   } catch (error) {
@@ -177,6 +186,8 @@ async function refresh(): Promise<void> {
     }
     warning = error instanceof Error ? error.message : "No se pudo actualizar";
     renderWarning();
+  } finally {
+    refreshInProgress = false;
   }
 }
 
@@ -189,9 +200,10 @@ async function fetchApi(population: Population = "students"): Promise<DashboardP
   if (!API_BASE) throw new Error("El Worker de LimeSurvey todavía no está configurado");
   const response = await fetch(`${API_BASE}/api/dashboard?population=${population}`, {
     headers: { Accept: "application/json", Authorization: authHeader },
+    signal: AbortSignal.timeout(45_000),
   });
   if (response.status === 401) throw new AuthenticationError("Credenciales inválidas");
-  if (!response.ok) throw new Error(`Actualización interrumpida (HTTP ${response.status})`);
+  if (!response.ok) throw new Error(`Servicio de datos no disponible (HTTP ${response.status})`);
   return response.json() as Promise<DashboardPayload>;
 }
 
@@ -200,39 +212,34 @@ async function handleLogin(event: SubmitEvent): Promise<void> {
   const username = document.querySelector<HTMLInputElement>("#login-username")?.value ?? "";
   const password = document.querySelector<HTMLInputElement>("#login-password")?.value ?? "";
   const remember = document.querySelector<HTMLInputElement>("#login-remember")?.checked ?? false;
-  authHeader = `Basic ${encodeCredentials(username, password)}`;
   const submit = document.querySelector<HTMLButtonElement>("#login-form button[type='submit']");
   if (submit) { submit.disabled = true; submit.textContent = "Verificando…"; }
   try {
-    const [studentRaw, teacherRaw, familyRaw] = await Promise.all([
-      fetchApi("students"),
-      fetchApi("teachers"),
-      fetchApi("families"),
-    ]);
-    const students = canonicalizePayload(studentRaw);
-    const teachers = canonicalizePayload(teacherRaw);
-    const families = canonicalizePayload(familyRaw);
-    validatePayload(students);
-    validatePayload(teachers);
-    validatePayload(families);
-    studentData = students;
-    teacherData = teachers;
-    familyData = families;
-    data = payloadForPopulation(activePopulation);
-    lastSuccessfulFetch = Date.now();
-    warning = "";
+    if (!API_BASE) throw new Error("El servicio de acceso todavía no está configurado.");
+    const response = await fetch(`${API_BASE}/api/session`, {
+      method: "POST",
+      headers: { Accept: "application/json", Authorization: `Basic ${encodeCredentials(username, password)}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (response.status === 401) throw new AuthenticationError("Credenciales inválidas");
+    if (!response.ok) throw new Error(`El servicio de acceso no está disponible (HTTP ${response.status}).`);
+    const session = await response.json() as { token?: unknown };
+    if (typeof session.token !== "string" || !session.token) throw new Error("El servicio de acceso devolvió una respuesta inválida.");
+    authHeader = `Bearer ${session.token}`;
     sessionStorage.setItem("dashboard-authorization", authHeader);
     if (remember) {
       localStorage.setItem("dashboard-username", username);
     } else {
       localStorage.removeItem("dashboard-username");
     }
+    const passwordInput = document.querySelector<HTMLInputElement>("#login-password");
+    if (passwordInput) passwordInput.value = "";
     hideLogin();
-    render();
+    await refresh();
   } catch (error) {
     authHeader = "";
     sessionStorage.removeItem("dashboard-authorization");
-    showLogin(error instanceof AuthenticationError ? "Usuario o contraseña incorrectos." : "No se pudo validar el acceso.");
+    showLogin(error instanceof AuthenticationError ? "Usuario o contraseña incorrectos." : error instanceof Error ? error.message : "El servicio de acceso no respondió.");
   } finally {
     if (submit) { submit.disabled = false; submit.textContent = "Ingresar"; }
   }
@@ -356,17 +363,28 @@ function selectPopulation(population: Population): void {
 }
 
 function render(): void {
-  if (!data) return;
   const studentsCount = document.querySelector<HTMLElement>("#students-count");
-  if (studentsCount) studentsCount.textContent = String(studentData?.summary.total ?? 0);
+  if (studentsCount) studentsCount.textContent = studentData ? String(studentData.summary.total) : "—";
   const teachersCount = document.querySelector<HTMLElement>("#teachers-count");
-  if (teachersCount) teachersCount.textContent = String(teacherData?.summary.total ?? 0);
+  if (teachersCount) teachersCount.textContent = teacherData ? String(teacherData.summary.total) : "—";
   const familiesCount = document.querySelector<HTMLElement>("#families-count");
-  if (familiesCount) familiesCount.textContent = String(familyData?.summary.total ?? 0);
-  if (activeSection === "panorama" && studentData && teacherData && familyData) {
+  if (familiesCount) familiesCount.textContent = familyData ? String(familyData.summary.total) : "—";
+  if (activeSection === "panorama") {
     const panorama = document.querySelector<HTMLElement>("#panorama-view");
-    if (panorama) renderPanoramaGeneral(panorama, { students: studentData, teachers: teacherData, families: familyData });
+    if (panorama) {
+      if (studentData && teacherData && familyData) {
+        renderPanoramaGeneral(panorama, { students: studentData, teachers: teacherData, families: familyData });
+        renderWarning();
+      } else {
+        panorama.innerHTML = `<div id="panorama-warning-slot">${warningMarkup()}</div><p>Acceso validado. El panorama estará disponible cuando respondan las tres encuestas. Podés consultar cada población que ya cargó.</p>`;
+      }
+    }
     updateSyncLabel();
+    return;
+  }
+  if (!data) {
+    const tracking = document.querySelector<HTMLElement>("#tracking-view");
+    if (tracking) tracking.innerHTML = `${warningMarkup()}<p>Los datos de esta población todavía no están disponibles. Se reintentará automáticamente.</p>`;
     return;
   }
   initializeFilters();
