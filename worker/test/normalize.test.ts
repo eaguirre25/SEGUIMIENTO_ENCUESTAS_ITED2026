@@ -56,7 +56,7 @@ describe("normalización", () => {
     expect(schoolIdentityKey({ school: EEST5_NAME, schoolNumber: 5, managementType: "state" })).toBe("state:eest-5");
   });
 
-  it("asigna el 5 numérico a la técnica solo en la jornada presencial confirmada", () => {
+  it("atribuye todas las respuestas del 8 y 9 de octubre a las técnicas 5 y 4", () => {
     const studentMap = { ...map, SCHOOL_IDENTIFIER: "identifier" };
     const result = buildDashboard([
       { school: "5", identifier: "5", startdate: "2026-10-08 15:00:00", submitdate: "2026-10-08 15:10:00" },
@@ -69,10 +69,11 @@ describe("normalización", () => {
       { school: "6", identifier: "5", startdate: "2026-10-08 15:00:00", submitdate: null },
     ], "test", studentMap);
     expect(result.summary.total).toBe(8);
-    expect(result.schools.find(school => school.school === EEST5_NAME)?.total).toBe(2);
-    expect(result.schools.find(school => school.school === officialStateSchoolName(5))?.total).toBe(5);
-    expect(result.schools.find(school => school.school === REVIEW_REQUIRED_NAME)?.total).toBe(1);
-    expect(result.monitoringRows.filter(row => row.classificationMethod === "time_window")).toHaveLength(2);
+    expect(result.schools.find(school => school.school === EEST5_NAME)?.total).toBe(6);
+    expect(result.schools.find(school => school.school === officialStateSchoolName(5))?.total).toBe(1);
+    expect(result.schools.find(school => school.school === "ESCUELA DE EDUCACIÓN SECUNDARIA TÉCNICA Nº4")?.total).toBe(1);
+    expect(result.schools.find(school => school.school === REVIEW_REQUIRED_NAME)).toBeUndefined();
+    expect(result.monitoringRows.filter(row => row.classificationMethod === "time_window")).toHaveLength(7);
   });
 
   it("usa la misma identidad local aunque una población no informe la gestión", () => {
