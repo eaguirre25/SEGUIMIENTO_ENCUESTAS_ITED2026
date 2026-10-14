@@ -1,4 +1,4 @@
-import { EEST5_NAME, resolveStudentSchool, EES6_NAME, EES4_NAME, EES47_NAME, EPS408_NAME, REVIEW_REQUIRED_NAME, officialStateSchoolName, schoolIdentityKey } from "../../shared/schools";
+import { EEST2_NAME, EEST5_NAME, resolveStudentSchool, EES6_NAME, EES4_NAME, EES47_NAME, EPS408_NAME, REVIEW_REQUIRED_NAME, officialStateSchoolName, schoolIdentityKey } from "../../shared/schools";
 import { describe, expect, it, vi } from "vitest";
 import { buildDashboard, detectCompletion, firstTeacherSchoolMention, isCoordinateInSanMartin, normalizeGender, normalizeSchool, parseAgeGroup, parseCourseYear, parseSchoolNumber, parseYesNo, splitTimestamp } from "../src/normalize";
 import { decodeExport, LimeSurveyClient } from "../src/limesurvey";
@@ -24,6 +24,32 @@ const map: QuestionMap = {
 };
 
 describe("normalización", () => {
+  it("identifica la Técnica 2 Alemania por su nombre y conserva la EES 2", () => {
+    for (const name of ["ET 2 Alemania", "EEST 2", "Técnica 2", "Alemania"]) {
+      expect(resolveStudentSchool(name, "2").identity.school).toBe(EEST2_NAME);
+    }
+    expect(resolveStudentSchool("EES 2", "2").identity.school).toBe(officialStateSchoolName(2));
+    expect(schoolIdentityKey({ school: EEST2_NAME, schoolNumber: 2, managementType: "state" })).toBe("state:eest-2");
+  });
+
+  it("atribuye la mañana del 14 de octubre a la Técnica 2 y conserva otras fechas y horarios", () => {
+    const result = buildDashboard([
+      { school: "2", identifier: "2", startdate: "2026-10-14 08:30:00", submitdate: "2026-10-14 09:00:00" },
+      { school: "EES 2", identifier: "2", startdate: "2026-10-14 12:59:59", submitdate: null },
+      { school: "EES 2", identifier: "2", startdate: "2026-10-14 13:00:00", submitdate: null },
+      { school: "EES 2", identifier: "2", startdate: "2026-10-13 09:00:00", submitdate: null },
+      { school: "EES 2", identifier: "2", startdate: "2026-10-14", submitdate: null },
+    ], "test", { ...map, SCHOOL_IDENTIFIER: "identifier" });
+    expect(result.summary).toMatchObject({ total: 5, complete: 1, incomplete: 4 });
+    expect(result.schools.find(s => s.school === EEST2_NAME)).toMatchObject({ total: 2, complete: 1, incomplete: 1 });
+    expect(result.schools.find(s => s.school === officialStateSchoolName(2))?.total).toBe(3);
+    expect(result.monitoringRows.filter(r => r.classificationMethod === "time_window")).toHaveLength(2);
+    const teachers = buildDashboard([
+      { school: "EES 2", startdate: "2026-10-14 09:00:00", submitdate: null },
+    ], "test", map);
+    expect(teachers.schools[0].school).toBe(officialStateSchoolName(2));
+  });
+
   it("distingue Galileo Galilei de la EES 5 en nombres e identificadores", () => {
     for (const variant of ["EEST 5", "E.E.S.T. Nro 5", "EET5", "Técnica 5", "Galileo", "Galilei", "Galilei Galilei", EEST5_NAME]) {
       expect(normalizeSchool(variant)?.original).toBe(EEST5_NAME);

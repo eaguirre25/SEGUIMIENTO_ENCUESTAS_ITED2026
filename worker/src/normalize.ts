@@ -1,6 +1,7 @@
 import {
   canonicalSchoolLabel,
   EEST5_NAME,
+  EEST2_NAME,
   technicalSchoolNumber,
   EPS408_NAME,
   REVIEW_REQUIRED_NAME,
@@ -469,8 +470,8 @@ function toMonitoringRow(
   };
 }
 
-// Jornadas presenciales confirmadas por ITED: 08/10 Técnica 5, 09/10 Técnica 4.
-// Todas las respuestas estudiantiles de esas fechas pertenecen a esas escuelas.
+// Jornadas confirmadas por ITED: 08/10 Técnica 5, 09/10 Técnica 4,
+// y mañana del 14/10 Técnica 2 Alemania (hasta las 13:00, hora de LimeSurvey).
 function applyConfirmedTechnicalFieldwork(
   rows: Array<{ raw: RawResponse; item: NormalizedResponse | null }>,
   map: QuestionMap,
@@ -478,10 +479,12 @@ function applyConfirmedTechnicalFieldwork(
   if (!map.SCHOOL_IDENTIFIER) return;
   for (const row of rows) {
     if (!row.item) continue;
-    const { date } = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(row.raw, map.LOAD_TIMESTAMP) : null);
-    const number = date === "2026-10-08" ? 5 : date === "2026-10-09" ? 4 : null;
+    const { date, time } = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(row.raw, map.LOAD_TIMESTAMP) : null);
+    const morningOctober14 = date === "2026-10-14" && /^\d{2}:\d{2}/.test(time)
+      && Number(time.slice(0, 2)) < 13;
+    const number = date === "2026-10-08" ? 5 : date === "2026-10-09" ? 4 : morningOctober14 ? 2 : null;
     if (number === null) continue;
-    const school = normalizeSchool(number === 5 ? EEST5_NAME : "EEST 4", "state")!;
+    const school = normalizeSchool(number === 5 ? EEST5_NAME : number === 2 ? EEST2_NAME : "EEST 4", "state")!;
     row.item.school = school.original;
     row.item.schoolKey = school.key;
     row.item.schoolNumber = number;

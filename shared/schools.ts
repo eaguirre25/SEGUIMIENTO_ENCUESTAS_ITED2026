@@ -5,6 +5,7 @@ export const EES6_NAME = 'ESCUELA DE EDUCACIÓN SECUNDARIA Nº6 "ALFONSINA STORN
 export const EES24_NAME = "ESCUELA DE EDUCACIÓN SECUNDARIA Nº24";
 export const EES47_NAME = 'ESCUELA DE EDUCACIÓN SECUNDARIA Nº47 "OSVALDO BAYER"';
 export const EEST5_NAME = 'ESCUELA DE EDUCACIÓN SECUNDARIA TÉCNICA Nº5 "GALILEO GALILEI"';
+export const EEST2_NAME = 'ESCUELA DE EDUCACIÓN SECUNDARIA TÉCNICA Nº2 "ALEMANIA"';
 export const EPS408_NAME = "ESCUELA PROFESIONAL SECUNDARIA · CFP Nº408";
 export const REVIEW_REQUIRED_NAME = "Requieren revisión";
 
@@ -49,12 +50,14 @@ export function officialStateSchoolName(number: number): string {
 export function technicalSchoolNumber(value: string): number | null {
   const folded = foldSchoolText(value);
   if (/\b(?:galileo|galilei)\b/.test(folded)) return 5;
+  if (/\balemania\b/.test(folded)) return 2;
   const compact = folded.replace(/\s+/g, "");
   if (!/^(?:eest|eet|et|tecnica|escuelatecnica|escueladeeducacion(?:secundaria)?tecnica)/.test(compact)) return null;
   return parseSchoolNumber(value);
 }
 
 function technicalSchoolName(number: number): string {
+  if (number === 2) return EEST2_NAME;
   return number === 5 ? EEST5_NAME : `ESCUELA DE EDUCACIÓN SECUNDARIA TÉCNICA Nº${number}`;
 }
 
