@@ -2,11 +2,14 @@ name: Desplegar Cloudflare Worker
 on:
   push:
     branches: [main]
-    paths: ["shared/**", "worker/**", "package-lock.json", ".github/workflows/deploy-worker.yml"]
+    paths: ["shared/**", "worker/**", "package.json", "package-lock.json", ".github/workflows/deploy-worker.yml"]
   workflow_dispatch:
 jobs:
-  deploy:
+  validate:
+    name: Validar Worker y comprobar configuración
     runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.cloudflare.outputs.configured }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -15,22 +18,41 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+      - run: npm ci
       - run: npm test
-      - name: Cloudflare pendiente de configurar
-        if: ${{ env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == '' }}
-        run: echo "Worker validado; despliegue omitido hasta configurar los secretos de Cloudflare."
-      - uses: cloudflare/wrangler-action@v3
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
+      - run: npm run typecheck --workspace worker
+      - name: Comprobar credenciales de despliegue
+        id: cloudflare
+        shell: bash
+        run: |
+          if [[ -z "$CLOUDFLARE_API_TOKEN" || -z "$CLOUDFLARE_ACCOUNT_ID" ]]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Despliegue pendiente: falta CLOUDFLARE_API_TOKEN o CLOUDFLARE_ACCOUNT_ID en los secretos del repositorio. La API publicada conserva su versión anterior."
+            echo "### Worker validado; despliegue pendiente" >> "$GITHUB_STEP_SUMMARY"
+            echo "Configurar CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID en los secretos del repositorio y volver a ejecutar este workflow. El job de despliegue queda omitido; las correcciones todavía no se publicaron en Cloudflare." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+  deploy:
+    name: Publicar Worker en Cloudflare
+    needs: validate
+    if: ${{ needs.validate.outputs.configured == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          node-version: 22
+      - run: npm ci
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
           command: d1 migrations apply limesurvey-dashboard-cache --remote --env production
       - uses: cloudflare/wrangler-action@v3
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
         with:
-          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
           command: deploy --env production
