@@ -26,7 +26,7 @@ export interface StudentSchoolResolution {
 }
 
 export function foldSchoolText(value: string): string {
-  return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR")
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase()
     .replace(/[^a-z0-9]+/g, " ").trim();
 }
 

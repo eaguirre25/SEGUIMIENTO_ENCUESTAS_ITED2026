@@ -56,7 +56,7 @@ export function normalizeSchool(value: unknown, managementType: ManagementType =
   if (!original) return null;
   return {
     original,
-    key: original.normalize("NFKC").toLocaleLowerCase("es-AR"),
+    key: original.normalize("NFKC").toLowerCase(),
   };
 }
 
@@ -70,7 +70,7 @@ export function detectCompletion(raw: RawResponse, field = "submitdate"): boolea
   if (value === true || value === 1) return true;
   if (value === false || value === 0 || value == null) return false;
   if (typeof value !== "string") return Boolean(value);
-  const normalized = value.trim().toLocaleLowerCase("es-AR");
+  const normalized = value.trim().toLowerCase();
   if (!normalized || ["n", "no", "false", "incomplete", "incompleta", "0", "null", "0000-00-00", "0000-00-00 00:00:00"].includes(normalized)) return false;
   return true;
 }
@@ -85,7 +85,7 @@ export function parseYesNo(value: unknown): boolean | null {
   if (value === true || value === 1) return true;
   if (value === false || value === 0) return false;
   if (typeof value !== "string") return null;
-  const normalized = value.trim().normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR");
+  const normalized = value.trim().normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
   if (["si", "s", "yes", "y", "1", "true"].includes(normalized)) return true;
   if (["no", "n", "0", "false"].includes(normalized)) return false;
   return null;
@@ -204,7 +204,7 @@ function normalizeExternalSchool(value: unknown): { original: string; key: strin
   if (!original) return null;
   return {
     original,
-    key: `external:${original.normalize("NFKC").toLocaleLowerCase("es-AR")}`,
+    key: `external:${original.normalize("NFKC").toLowerCase()}`,
   };
 }
 
@@ -228,7 +228,7 @@ function schoolAnswerAsReceived(raw: RawResponse, map: QuestionMap): string {
 }
 
 function normalizeManagementType(value: unknown): ManagementType {
-  const normalized = String(value ?? "").trim().normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR");
+  const normalized = String(value ?? "").trim().normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
   if (normalized === "estatal") return "state";
   if (normalized === "privada") return "private";
   return "unknown";
@@ -251,7 +251,7 @@ function readMappedValue(raw: RawResponse, fields: string | readonly string[]): 
 }
 
 function keyMatchesQuestionCode(key: string, questionCode: string): boolean {
-  if (!key.toLocaleUpperCase("es-AR").startsWith(questionCode.toLocaleUpperCase("es-AR"))) return false;
+  if (!key.toUpperCase().startsWith(questionCode.toUpperCase())) return false;
   const boundary = key.charAt(questionCode.length);
   return boundary === "" || /[\s.:[\]-]/.test(boundary);
 }
@@ -304,8 +304,8 @@ function addDemographic(demographics: DemographicSummary, ageGroup: AgeGroup | n
   }
   if (gender) {
     demographics.validGenders += 1;
-    const key = gender.normalize("NFKC").toLocaleLowerCase("es-AR");
-    const existing = demographics.genders.find((item) => item.label.normalize("NFKC").toLocaleLowerCase("es-AR") === key);
+    const key = gender.normalize("NFKC").toLowerCase();
+    const existing = demographics.genders.find((item) => item.label.normalize("NFKC").toLowerCase() === key);
     if (existing) existing.count += 1;
     else demographics.genders.push({ label: gender, count: 1 });
   }
@@ -323,9 +323,20 @@ export function studentAssignmentCandidates(
   rawResponses: readonly RawResponse[],
   map: QuestionMap,
   excludedResponseKeys: ReadonlySet<string>,
-): LoadMonitoringRow[] {
+): ReturnType<typeof studentAssignmentFingerprint>[] {
   return rawResponses.filter(raw => !isExcludedTestResponse(raw, map, excludedResponseKeys))
-    .map(raw => toMonitoringRow(raw, map));
+    .map(raw => studentAssignmentFingerprint(raw, map));
+}
+
+function studentAssignmentFingerprint(raw: RawResponse, map: QuestionMap) {
+  const timestamp = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(raw, map.LOAD_TIMESTAMP) : null);
+  return {
+    ...timestamp,
+    school: schoolAnswerAsReceived(raw, map),
+    schoolIdentifier: answerAsReceived(map.SCHOOL_IDENTIFIER ? readMappedValue(raw, map.SCHOOL_IDENTIFIER) : null),
+    courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
+    complete: detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
+  };
 }
 
 export function buildDashboard(
@@ -355,7 +366,7 @@ export function buildDashboard(
   if (surveyId === "977929" && map.SCHOOL_IDENTIFIER) {
     for (const row of classified) {
       if (!row.item) continue;
-      const key = studentAssignmentKey(toMonitoringRow(row.raw, map, row.item));
+      const key = studentAssignmentKey(studentAssignmentFingerprint(row.raw, map));
       const number = reviewedAssignments.get(key);
       if (number === undefined) continue;
       const school = normalizeSchool(`EES ${number}`, "state")!;
@@ -453,7 +464,7 @@ export function isExcludedTestResponse(
   map: QuestionMap = QUESTION_MAP,
   excludedResponseKeys: ReadonlySet<string> = LEGACY_EXCLUDED_TEST_RESPONSE_KEYS,
 ): boolean {
-  const row = toMonitoringRow(raw, map);
+  const row = studentAssignmentFingerprint(raw, map);
   const declaredManagement = normalizeManagementType(readSemanticValue(raw, map.MANAGEMENT_TYPE, isManagementAnswer));
   return excludedResponseKeys.has(monitoringRowKey({
     ...row,
@@ -529,14 +540,23 @@ function applyTemporalSchoolInference(
   if (!map.SCHOOL_IDENTIFIER) return;
   const timed = rows.map((row) => ({ ...row, timestamp: responseTimestamp(row.raw, map) }));
   const anchors = timed.filter((row) => row.item && row.item.classificationMethod !== "requires_review" && row.timestamp !== null);
+  // Anchor identities do not change during inference. Compute them once,
+  // rather than re-normalizing every school for every incomplete response.
+  const anchorsByDay = new Map<number, Array<{ timestamp: number; key: string; item: NormalizedResponse }>>();
+  for (const anchor of anchors) {
+    const day = Math.floor(anchor.timestamp! / 86_400_000);
+    const daily = anchorsByDay.get(day) ?? [];
+    daily.push({ timestamp: anchor.timestamp!, key: schoolIdentityKey(anchor.item!), item: anchor.item! });
+    anchorsByDay.set(day, daily);
+  }
   for (const row of timed) {
     if (!row.item || row.item.reviewReason !== "insufficient" || row.timestamp === null) continue;
-    const nearby = anchors.filter((anchor) => anchor.timestamp !== null && sameSurveyDate(anchor.timestamp, row.timestamp!)
-      && Math.abs(anchor.timestamp - row.timestamp!) <= 120 * 60_000);
+    const nearby = (anchorsByDay.get(Math.floor(row.timestamp / 86_400_000)) ?? [])
+      .filter(anchor => Math.abs(anchor.timestamp - row.timestamp!) <= 120 * 60_000);
     if (nearby.length < 2) continue;
     const counts = new Map<string, { item: NormalizedResponse; count: number }>();
     for (const anchor of nearby) {
-      const key = schoolIdentityKey(anchor.item!);
+      const key = anchor.key;
       const current = counts.get(key) ?? { item: anchor.item!, count: 0 };
       current.count += 1;
       counts.set(key, current);
@@ -558,10 +578,6 @@ function responseTimestamp(raw: RawResponse, map: QuestionMap): number | null {
   const match = `${date} ${time || "00:00:00"}`.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?$/);
   if (!match) return null;
   return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6] ?? 0));
-}
-
-function sameSurveyDate(left: number, right: number): boolean {
-  return new Date(left).toISOString().slice(0, 10) === new Date(right).toISOString().slice(0, 10);
 }
 
 function teacherRoleAsReceived(raw: RawResponse, map: QuestionMap): string {
@@ -592,11 +608,11 @@ function isManagementAnswer(value: unknown): boolean {
 
 function isTeacherRoleAnswer(value: unknown): boolean {
   if (typeof value !== "string") return false;
-  const normalized = value.trim().normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR");
+  const normalized = value.trim().normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
   return /\b(docente|directiv|director|conduccion|preceptor|orientador|bibliotecari|coordinador)\b/.test(normalized);
 }
 
-function monitoringRowKey(row: LoadMonitoringRow): string {
+function monitoringRowKey(row: Pick<LoadMonitoringRow, "date" | "time" | "school" | "schoolIdentifier" | "managementType" | "courseYear" | "complete">): string {
   return [
     row.date,
     row.time,
@@ -609,7 +625,7 @@ function monitoringRowKey(row: LoadMonitoringRow): string {
 }
 
 function normalizeExclusionText(value: string): string {
-  return value.trim().replace(/\s+/g, " ").normalize("NFKC").toLocaleLowerCase("es-AR");
+  return value.trim().replace(/\s+/g, " ").normalize("NFKC").toLowerCase();
 }
 
 function answerAsReceived(value: unknown): string {
