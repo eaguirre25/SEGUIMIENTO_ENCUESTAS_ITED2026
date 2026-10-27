@@ -12,6 +12,7 @@ const MULTIPLE_ALL_TYPES = new Set(["1", "A", "B", "C", "E", "F", "H", "K", "Q",
 const SYSTEM_FIELDS = new Set(["id", "token", "submitdate", "lastpage", "startlanguage", "seed", "startdate", "datestamp", "ipaddr", "refurl"]);
 const requiredQuestionCache = new WeakMap<object, SurveyQuestionDefinition[]>();
 const relevanceTokenCache = new Map<string, Token[]>();
+const questionAliasCache = new WeakMap<object, Map<string, string>>();
 
 export function calculateRequiredProgress(
   raw: RawResponse,
@@ -42,14 +43,18 @@ export function isQuestionAnswered(question: SurveyQuestionDefinition, raw: RawR
 }
 
 function indexQuestionValues(raw: RawResponse, questions: readonly SurveyQuestionDefinition[]): Map<string, unknown[]> {
-  const aliases = new Map<string, string>();
-  for (const question of questions) {
-    aliases.set(question.code, question.code);
-    if (question.sid && question.gid) aliases.set(`${question.sid}X${question.gid}X${question.qid}`, question.code);
+  let aliases = questionAliasCache.get(questions);
+  if (!aliases) {
+    aliases = new Map<string, string>();
+    for (const question of questions) {
+      aliases.set(question.code, question.code);
+      if (question.sid && question.gid) aliases.set(`${question.sid}X${question.gid}X${question.qid}`, question.code);
+    }
+    questionAliasCache.set(questions, aliases);
   }
   const result = new Map<string, unknown[]>();
   for (const [key, value] of Object.entries(raw)) {
-    if (SYSTEM_FIELDS.has(key.toLocaleLowerCase("en"))) continue;
+    if (SYSTEM_FIELDS.has(key.toLowerCase())) continue;
     let code = aliases.get(key);
     if (!code) {
       const boundary = key.search(/[\s.:[\]#-]/);
@@ -66,7 +71,7 @@ function indexQuestionValues(raw: RawResponse, questions: readonly SurveyQuestio
 function matchingValues(question: SurveyQuestionDefinition, raw: RawResponse): unknown[] {
   const sgqa = question.sid && question.gid ? `${question.sid}X${question.gid}X${question.qid}` : "";
   return Object.entries(raw)
-    .filter(([key]) => !SYSTEM_FIELDS.has(key.toLocaleLowerCase("en")) && (
+    .filter(([key]) => !SYSTEM_FIELDS.has(key.toLowerCase()) && (
       keyMatchesPrefix(key, question.code) || (sgqa && keyMatchesPrefix(key, sgqa))
     ))
     .map(([, value]) => value);
@@ -214,6 +219,6 @@ function readExpressionValue(raw: RawResponse, code: string): unknown {
   return match?.[1] ?? null;
 }
 
-function comparable(value: unknown): string { return String(value ?? "").trim().toLocaleLowerCase("es-AR"); }
+function comparable(value: unknown): string { return String(value ?? "").trim().toLowerCase(); }
 function truthy(value: unknown): boolean { return isAnsweredValue(value) && !/^(?:0|false|N|No)$/i.test(String(value).trim()); }
 function round2(value: number): number { return Math.round((value + Number.EPSILON) * 100) / 100; }
