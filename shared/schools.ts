@@ -16,7 +16,7 @@ export interface SchoolIdentity {
   inSanMartin?: boolean | null;
 }
 
-export type SchoolClassificationMethod = "direct" | "id_and_name" | "name_only" | "id_only" | "time_window" | "requires_review";
+export type SchoolClassificationMethod = "direct" | "id_and_name" | "name_only" | "id_only" | "time_window" | "requires_review" | "reviewed";
 export type SchoolReviewReason = "conflict" | "insufficient";
 
 export interface StudentSchoolResolution {

@@ -532,7 +532,7 @@ function renderMonitoring(): void {
           ${requiredProgressCell(row)}
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "SI" : "NO"}</span></td>
         </tr>` : `<tr>
-          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td><strong>${escapeHtml(monitoringResolvedName(row))}</strong>${row.classificationMethod === "time_window" ? "<small>Inferida por fecha y horario</small>" : row.classificationMethod === "requires_review" ? `<small>${row.reviewReason === "conflict" ? "ID y respuesta contradictorios" : "Sin datos suficientes"}</small>` : ""}</td><td>${escapeHtml(row.school)}</td><td>${escapeHtml(row.schoolIdentifier)}</td>
+          <td>${formatDate(row.date)}</td><td>${escapeHtml(row.time || "—")}</td><td><strong>${escapeHtml(monitoringResolvedName(row))}</strong>${row.classificationMethod === "reviewed" ? "<small>Asignación auditada · confianza alta</small>" : row.classificationMethod === "time_window" ? "<small>Inferida por fecha y horario</small>" : row.classificationMethod === "requires_review" ? `<small>${row.reviewReason === "conflict" ? "ID y respuesta contradictorios" : "Sin datos suficientes"}</small>` : ""}</td><td>${escapeHtml(row.school)}</td><td>${escapeHtml(row.schoolIdentifier)}</td>
           <td><span class="management-badge ${row.managementType}">${managementLabel(row.managementType)}</span></td><td>${row.courseYear === null ? "Sin informar" : `${row.courseYear}.º año`}</td>
           ${requiredProgressCell(row)}
           <td><span class="completion-badge ${row.complete ? "yes" : "no"}">${row.complete ? "SI" : "NO"}</span></td>

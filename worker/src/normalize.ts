@@ -25,6 +25,7 @@ import type {
   SchoolSummary,
 } from "./types";
 import { calculateRequiredProgress } from "./required-progress";
+import { studentAssignmentKey } from "./reviewed-student-assignments";
 
 type OptionalSchoolBranch = "PRIVATE_SCHOOL" | "STATE_SCHOOL" | "ROLE" | "ROLE_OTHER" | "IN_SAN_MARTIN" | "AGE" | "GENDER" | "EXTERNAL_SCHOOL";
 export type QuestionMap = Omit<Record<keyof typeof QUESTION_MAP, string | readonly string[] | null>, OptionalSchoolBranch>
@@ -318,6 +319,15 @@ function finishDemographics(demographics: DemographicSummary): DemographicSummar
   };
 }
 
+export function studentAssignmentCandidates(
+  rawResponses: readonly RawResponse[],
+  map: QuestionMap,
+  excludedResponseKeys: ReadonlySet<string>,
+): LoadMonitoringRow[] {
+  return rawResponses.filter(raw => !isExcludedTestResponse(raw, map, excludedResponseKeys))
+    .map(raw => toMonitoringRow(raw, map));
+}
+
 export function buildDashboard(
   rawResponses: RawResponse[],
   surveyId: string,
@@ -326,6 +336,7 @@ export function buildDashboard(
   excludedResponseKeys: ReadonlySet<string> = LEGACY_EXCLUDED_TEST_RESPONSE_KEYS,
   requiredQuestions: readonly SurveyQuestionDefinition[] = [],
   progressResponses: readonly RawResponse[] = rawResponses,
+  reviewedAssignments: ReadonlyMap<string, number> = new Map(),
 ): DashboardPayload {
   const progressById = new Map(progressResponses.flatMap((raw) => raw.id === null || raw.id === undefined ? [] : [[String(raw.id), raw] as const]));
   const includedResponses = rawResponses.filter((raw) => !isExcludedTestResponse(raw, map, excludedResponseKeys));
@@ -339,6 +350,23 @@ export function buildDashboard(
   });
   applyConfirmedTechnicalFieldwork(classified, map);
   applyTemporalSchoolInference(classified, map);
+  // Apply the closed audit list last, so corrected rows cannot become anchors
+  // that change medium-confidence, open, or unaudited responses.
+  if (surveyId === "977929" && map.SCHOOL_IDENTIFIER) {
+    for (const row of classified) {
+      if (!row.item) continue;
+      const key = studentAssignmentKey(toMonitoringRow(row.raw, map, row.item));
+      const number = reviewedAssignments.get(key);
+      if (number === undefined) continue;
+      const school = normalizeSchool(`EES ${number}`, "state")!;
+      row.item.school = school.original;
+      row.item.schoolKey = school.key;
+      row.item.schoolNumber = number;
+      row.item.managementType = "state";
+      row.item.classificationMethod = "reviewed";
+      delete row.item.reviewReason;
+    }
+  }
   const normalized = classified.flatMap(({ item }) => item ? [item] : []);
   const summary = emptyCounts();
   const demographics = emptyDemographics();
