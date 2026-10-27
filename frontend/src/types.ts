@@ -44,7 +44,7 @@ export interface DashboardPayload {
     school: string;
     schoolIdentifier: string;
     resolvedSchool: string;
-    classificationMethod: "direct" | "id_and_name" | "name_only" | "id_only" | "time_window" | "requires_review";
+    classificationMethod: "direct" | "id_and_name" | "name_only" | "id_only" | "time_window" | "requires_review" | "reviewed";
     reviewReason?: "conflict" | "insufficient";
     role: string;
     managementType: ManagementType;

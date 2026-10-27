@@ -1,5 +1,7 @@
 import { LimeSurveyClient } from "./limesurvey";
-import { buildDashboard, LEGACY_EXCLUDED_TEST_RESPONSE_KEYS } from "./normalize";
+import { buildDashboard, LEGACY_EXCLUDED_TEST_RESPONSE_KEYS, studentAssignmentCandidates } from "./normalize";
+import { matchApprovedStudentAssignments } from "./reviewed-student-assignments";
+import { APPROVED_STUDENT_ASSIGNMENTS, STUDENT_ASSIGNMENT_AUDIT_REVISION } from "./reviewed-student-manifest";
 import {
   DASHBOARD_EXPORT_FIELDS,
   FAMILY_DASHBOARD_EXPORT_FIELDS,
@@ -127,7 +129,8 @@ async function readCachedDashboard(
   ).bind(population).first<{ payload: string }>();
   if (!row?.payload) return null;
   try {
-    const cached = JSON.parse(row.payload) as { surveyId?: unknown; generatedAt?: unknown };
+    const cached = JSON.parse(row.payload) as { surveyId?: unknown; generatedAt?: unknown; assignmentAudit?: { revision?: string } };
+    if (population === "students" && cached.assignmentAudit?.revision !== STUDENT_ASSIGNMENT_AUDIT_REVISION) return null;
     return cached.surveyId === expectedSurveyId && typeof cached.generatedAt === "string"
       ? { payload: row.payload, generatedAt: cached.generatedAt }
       : null;
@@ -145,7 +148,13 @@ async function refreshDashboard(env: Env, population: DashboardPopulation): Prom
   );
   const { responses: raw, progressResponses, questions } = await client.exportResponsesWithQuestions(Number(config.surveyId), config.exportFields);
   const exclusions = await readExcludedResponseKeys(env);
-  const serialized = JSON.stringify(buildDashboard(raw, config.surveyId, config.questionMap, new Date().toISOString(), exclusions, questions, progressResponses));
+  const generatedAt = new Date().toISOString();
+  const reviewed = population === "students" && config.surveyId === "977929"
+    ? await matchApprovedStudentAssignments(studentAssignmentCandidates(raw, config.questionMap, exclusions)) : new Map<string, number>();
+  const payload = buildDashboard(raw, config.surveyId, config.questionMap, generatedAt, exclusions, questions, progressResponses, reviewed);
+  const serialized = JSON.stringify({ ...payload, ...(population === "students" ? { assignmentAudit: {
+    revision: STUDENT_ASSIGNMENT_AUDIT_REVISION, approved: APPROVED_STUDENT_ASSIGNMENTS.size, matched: reviewed.size,
+  } } : {}) });
   await env.DASHBOARD_DB.prepare(`
     INSERT INTO dashboard_population_cache (population, payload, updated_at)
     VALUES (?1, ?2, datetime('now'))
