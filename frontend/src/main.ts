@@ -898,7 +898,7 @@ function renderWarning(): void {
       tracking.prepend(slot);
     }
   }
-  slot?.replaceChildren(warningElement());
+  slot?.replaceChildren(...(warning ? [warningElement()] : []));
   updateSyncLabel();
 }
 
