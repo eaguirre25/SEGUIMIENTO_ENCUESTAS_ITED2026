@@ -124,7 +124,11 @@ export function isCoordinateInSanMartin(lat: number, lon: number): boolean {
     && lon >= SAN_MARTIN_BOUNDS.minLon && lon <= SAN_MARTIN_BOUNDS.maxLon;
 }
 
-export function normalizeResponse(raw: RawResponse, map: QuestionMap): NormalizedResponse | null {
+export function normalizeResponse(
+  raw: RawResponse,
+  map: QuestionMap,
+  precomputed?: { courseYear: number | null; complete: boolean },
+): NormalizedResponse | null {
   if (!map.SCHOOL) throw new Error("Falta configurar QUESTION_MAP.SCHOOL en src/question-map.ts");
   const identity = identifySchool(raw, map);
   if (!identity) return null;
@@ -136,8 +140,8 @@ export function normalizeResponse(raw: RawResponse, map: QuestionMap): Normalize
     schoolKey: school.key,
     schoolNumber,
     managementType,
-    courseYear: map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null,
-    complete: detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
+    courseYear: precomputed ? precomputed.courseYear : (map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null),
+    complete: precomputed ? precomputed.complete : detectCompletion(raw, firstField(map.COMPLETION) ?? "submitdate"),
     lat,
     lon,
     ageGroup: map.AGE ? parseAgeGroup(readMappedValue(raw, map.AGE)) : null,
@@ -235,23 +239,33 @@ function normalizeManagementType(value: unknown): ManagementType {
 }
 
 function readMappedValue(raw: RawResponse, fields: string | readonly string[]): unknown {
-  for (const field of typeof fields === "string" ? [fields] : fields) {
-    const exactValue = raw[field];
+  const fieldList = typeof fields === "string" ? [fields] : fields;
+  for (let index = 0; index < fieldList.length; index += 1) {
+    const exactValue = raw[fieldList[index]];
     if (exactValue !== null && exactValue !== undefined && String(exactValue).trim() !== "") return exactValue;
-    const matchingEntry = Object.entries(raw).find(([key, value]) => (
-      keyMatchesQuestionCode(key, field)
-      && value !== null
-      && value !== undefined
-      && String(value).trim() !== ""
-    ));
-    const value = matchingEntry?.[1];
-    if (value !== null && value !== undefined && String(value).trim() !== "") return value;
+  }
+  const keys = Object.keys(raw);
+  for (let fieldIndex = 0; fieldIndex < fieldList.length; fieldIndex += 1) {
+    const field = fieldList[fieldIndex];
+    for (let keyIndex = 0; keyIndex < keys.length; keyIndex += 1) {
+      const key = keys[keyIndex];
+      const value = raw[key];
+      if (
+        value !== null
+        && value !== undefined
+        && String(value).trim() !== ""
+        && keyMatchesQuestionCode(key, field)
+      ) {
+        return value;
+      }
+    }
   }
   return null;
 }
 
 function keyMatchesQuestionCode(key: string, questionCode: string): boolean {
-  if (!key.toUpperCase().startsWith(questionCode.toUpperCase())) return false;
+  if (key.length < questionCode.length) return false;
+  if (key.slice(0, questionCode.length).toUpperCase() !== questionCode.toUpperCase()) return false;
   const boundary = key.charAt(questionCode.length);
   return boundary === "" || /[\s.:[\]-]/.test(boundary);
 }
@@ -350,23 +364,43 @@ export function buildDashboard(
   reviewedAssignments: ReadonlyMap<string, number> = new Map(),
 ): DashboardPayload {
   const progressById = new Map(progressResponses.flatMap((raw) => raw.id === null || raw.id === undefined ? [] : [[String(raw.id), raw] as const]));
+  const completionField = firstField(map.COMPLETION) ?? "submitdate";
   const includedResponses = rawResponses.filter((raw) => !isExcludedTestResponse(raw, map, excludedResponseKeys));
   const classified = includedResponses.map((raw, index) => {
     const responseId = raw.id === null || raw.id === undefined ? null : String(raw.id);
+    const timestamp = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(raw, map.LOAD_TIMESTAMP) : null);
+    const schoolReceived = schoolAnswerAsReceived(raw, map);
+    const schoolIdentifier = answerAsReceived(map.SCHOOL_IDENTIFIER ? readMappedValue(raw, map.SCHOOL_IDENTIFIER) : null);
+    const courseYear = map.COURSE_YEAR ? parseCourseYear(readMappedValue(raw, map.COURSE_YEAR)) : null;
+    const complete = detectCompletion(raw, completionField);
+    const item = normalizeResponse(raw, map, { courseYear, complete });
     return {
       raw,
       progressRaw: (responseId ? progressById.get(responseId) : null) ?? progressResponses[index] ?? raw,
-      item: normalizeResponse(raw, map),
+      item,
+      date: timestamp.date,
+      time: timestamp.time,
+      schoolReceived,
+      schoolIdentifier,
+      courseYear,
+      complete,
     };
   });
   applyConfirmedTechnicalFieldwork(classified, map);
   applyTemporalSchoolInference(classified, map);
   // Apply the closed audit list last, so corrected rows cannot become anchors
   // that change medium-confidence, open, or unaudited responses.
-  if (surveyId === "977929" && map.SCHOOL_IDENTIFIER) {
+  if (surveyId === "977929" && map.SCHOOL_IDENTIFIER && reviewedAssignments.size > 0) {
     for (const row of classified) {
       if (!row.item) continue;
-      const key = studentAssignmentKey(studentAssignmentFingerprint(row.raw, map));
+      const key = studentAssignmentKey({
+        date: row.date,
+        time: row.time,
+        school: row.schoolReceived,
+        schoolIdentifier: row.schoolIdentifier,
+        courseYear: row.courseYear,
+        complete: row.complete,
+      });
       const number = reviewedAssignments.get(key);
       if (number === undefined) continue;
       const school = normalizeSchool(`EES ${number}`, "state")!;
@@ -378,39 +412,71 @@ export function buildDashboard(
       delete row.item.reviewReason;
     }
   }
-  const normalized = classified.flatMap(({ item }) => item ? [item] : []);
   const summary = emptyCounts();
   const demographics = emptyDemographics();
   const schools = new Map<string, SchoolSummary>();
+  const mapPoints: DashboardPayload["mapPoints"] = [];
+  const monitoringRows: LoadMonitoringRow[] = [];
 
-  const completionField = firstField(map.COMPLETION) ?? "submitdate";
-  for (const raw of includedResponses) {
-    add(summary, detectCompletion(raw, completionField));
-    addDemographic(
-      demographics,
-      map.AGE ? parseAgeGroup(readMappedValue(raw, map.AGE)) : null,
-      map.GENDER ? normalizeGender(readMappedValue(raw, map.GENDER)) : null,
-    );
-  }
+  for (const row of classified) {
+    const { raw, progressRaw, item, date, time, schoolReceived, schoolIdentifier, courseYear, complete } = row;
+    add(summary, complete);
+    const ageGroup = item ? item.ageGroup : (map.AGE ? parseAgeGroup(readMappedValue(raw, map.AGE)) : null);
+    const gender = item ? item.gender : (map.GENDER ? normalizeGender(readMappedValue(raw, map.GENDER)) : null);
+    addDemographic(demographics, ageGroup, gender);
 
-  for (const item of normalized) {
-    let school = schools.get(item.schoolKey);
-    if (!school) {
-      school = {
-        school: item.school,
-        ...(item.schoolKey.startsWith("external:") ? { inSanMartin: false } : {}),
-        schoolNumber: item.schoolNumber,
-        managementType: item.managementType,
-        ...emptyCounts(),
-        roles: { student: createRole() },
-        demographics: emptyDemographics(),
-      };
-      schools.set(item.schoolKey, school);
+    if (item) {
+      let school = schools.get(item.schoolKey);
+      if (!school) {
+        school = {
+          school: item.school,
+          ...(item.schoolKey.startsWith("external:") ? { inSanMartin: false } : {}),
+          schoolNumber: item.schoolNumber,
+          managementType: item.managementType,
+          ...emptyCounts(),
+          roles: { student: createRole() },
+          demographics: emptyDemographics(),
+        };
+        schools.set(item.schoolKey, school);
+      }
+      add(school, complete);
+      add(school.roles.student, complete);
+      if (courseYear) add(school.roles.student.years[String(courseYear)], complete);
+      addDemographic(school.demographics, ageGroup, gender);
     }
-    add(school, item.complete);
-    add(school.roles.student, item.complete);
-    if (item.courseYear) add(school.roles.student.years[String(item.courseYear)], item.complete);
-    addDemographic(school.demographics, item.ageGroup, item.gender);
+
+    const lat = item ? item.lat : (map.LATITUDE ? parseCoordinate(readMappedValue(raw, map.LATITUDE), "lat") : null);
+    const lon = item ? item.lon : (map.LONGITUDE ? parseCoordinate(readMappedValue(raw, map.LONGITUDE), "lon") : null);
+    if (lat !== null && lon !== null && isCoordinateInSanMartin(lat, lon)) {
+      mapPoints.push({
+        school: item?.school ?? REVIEW_REQUIRED_NAME,
+        schoolNumber: item?.schoolNumber ?? null,
+        managementType: item?.managementType ?? "unknown",
+        complete,
+        lat,
+        lon,
+      });
+    }
+
+    const progress = requiredQuestions.length ? calculateRequiredProgress(progressRaw, requiredQuestions) : null;
+    monitoringRows.push({
+      date,
+      time,
+      school: schoolReceived,
+      schoolIdentifier,
+      resolvedSchool: item?.school ?? REVIEW_REQUIRED_NAME,
+      classificationMethod: item?.classificationMethod ?? "requires_review",
+      ...(item?.reviewReason ? { reviewReason: item.reviewReason } : {}),
+      role: map.ROLE ? teacherRoleAsReceived(raw, map) : "Sin informar",
+      managementType: item?.managementType ?? "unknown",
+      courseYear,
+      inSanMartin: map.IN_SAN_MARTIN ? parseYesNo(readMappedValue(raw, map.IN_SAN_MARTIN)) : null,
+      complete,
+      answeredRequiredQuestions: progress?.answeredRequiredQuestions ?? null,
+      requiredQuestions: progress?.requiredQuestions ?? null,
+      missingRequiredQuestions: progress?.missingRequiredQuestions ?? null,
+      requiredCompletionPct: progress?.requiredCompletionPct ?? null,
+    });
   }
 
   const schoolList = [...schools.values()]
@@ -434,28 +500,20 @@ export function buildDashboard(
     }))
     .sort((a, b) => b.total - a.total || a.school.localeCompare(b.school, "es"));
 
+  monitoringRows.sort((left, right) => {
+    const leftKey = `${left.date} ${left.time}`;
+    const rightKey = `${right.date} ${right.time}`;
+    return rightKey < leftKey ? -1 : rightKey > leftKey ? 1 : 0;
+  });
+
   return {
     generatedAt,
     surveyId,
     summary: finishCounts(summary),
     demographics: finishDemographics(demographics),
     schools: schoolList,
-    mapPoints: classified.flatMap(({ raw, item }) => {
-      const lat = map.LATITUDE ? parseCoordinate(readMappedValue(raw, map.LATITUDE), "lat") : null;
-      const lon = map.LONGITUDE ? parseCoordinate(readMappedValue(raw, map.LONGITUDE), "lon") : null;
-      if (lat === null || lon === null || !isCoordinateInSanMartin(lat, lon)) return [];
-      return [{
-        school: item?.school ?? REVIEW_REQUIRED_NAME,
-        schoolNumber: item?.schoolNumber ?? null,
-        managementType: item?.managementType ?? "unknown",
-        complete: detectCompletion(raw, completionField),
-        lat,
-        lon,
-      }];
-    }),
-    monitoringRows: classified
-      .map(({ raw, progressRaw, item }) => toMonitoringRow(raw, map, item, requiredQuestions, progressRaw))
-      .sort((left, right) => `${right.date} ${right.time}`.localeCompare(`${left.date} ${left.time}`)),
+    mapPoints,
+    monitoringRows,
   };
 }
 
@@ -512,13 +570,15 @@ function toMonitoringRow(
 // Jornadas confirmadas por ITED: 08/10 Técnica 5, 09/10 Técnica 4,
 // y mañana del 14/10 Técnica 2 Alemania (hasta las 13:00, hora de LimeSurvey).
 function applyConfirmedTechnicalFieldwork(
-  rows: Array<{ raw: RawResponse; item: NormalizedResponse | null }>,
+  rows: Array<{ raw: RawResponse; item: NormalizedResponse | null; date?: string; time?: string }>,
   map: QuestionMap,
 ): void {
   if (!map.SCHOOL_IDENTIFIER) return;
   for (const row of rows) {
     if (!row.item) continue;
-    const { date, time } = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(row.raw, map.LOAD_TIMESTAMP) : null);
+    const { date, time } = row.date !== undefined && row.time !== undefined
+      ? { date: row.date, time: row.time }
+      : splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(row.raw, map.LOAD_TIMESTAMP) : null);
     const morningOctober14 = date === "2026-10-14" && /^\d{2}:\d{2}/.test(time)
       && Number(time.slice(0, 2)) < 13;
     const number = date === "2026-10-08" ? 5 : date === "2026-10-09" ? 4 : morningOctober14 ? 2 : null;
@@ -534,11 +594,11 @@ function applyConfirmedTechnicalFieldwork(
 }
 
 function applyTemporalSchoolInference(
-  rows: Array<{ raw: RawResponse; item: NormalizedResponse | null }>,
+  rows: Array<{ raw: RawResponse; item: NormalizedResponse | null; date?: string; time?: string }>,
   map: QuestionMap,
 ): void {
   if (!map.SCHOOL_IDENTIFIER) return;
-  const timed = rows.map((row) => ({ ...row, timestamp: responseTimestamp(row.raw, map) }));
+  const timed = rows.map((row) => ({ ...row, timestamp: responseTimestamp(row.raw, map, row.date, row.time) }));
   const anchors = timed.filter((row) => row.item && row.item.classificationMethod !== "requires_review" && row.timestamp !== null);
   // Anchor identities do not change during inference. Compute them once,
   // rather than re-normalizing every school for every incomplete response.
@@ -573,8 +633,10 @@ function applyTemporalSchoolInference(
   }
 }
 
-function responseTimestamp(raw: RawResponse, map: QuestionMap): number | null {
-  const { date, time } = splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(raw, map.LOAD_TIMESTAMP) : null);
+function responseTimestamp(raw: RawResponse, map: QuestionMap, preDate?: string, preTime?: string): number | null {
+  const { date, time } = preDate !== undefined && preTime !== undefined
+    ? { date: preDate, time: preTime }
+    : splitTimestamp(map.LOAD_TIMESTAMP ? readMappedValue(raw, map.LOAD_TIMESTAMP) : null);
   const match = `${date} ${time || "00:00:00"}`.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?$/);
   if (!match) return null;
   return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6] ?? 0));

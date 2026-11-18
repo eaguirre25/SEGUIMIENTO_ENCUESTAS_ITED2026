@@ -23,26 +23,35 @@ export function calculateRequiredProgress(
     required = questions.filter((question) => question.mandatory === "Y" && question.parentQid === null);
     requiredQuestionCache.set(questions as object, required);
   }
-  const indexedValues = indexQuestionValues(raw, required);
-  const applicable = required.filter((question) => isQuestionApplicable(question.relevance, raw));
-  const answered = applicable.filter((question) => isQuestionAnswered(question, raw, indexedValues.get(question.code))).length;
+  const { indexedValues, expressionValues } = indexQuestionValues(raw, required);
+  let applicableCount = 0;
+  let answeredCount = 0;
+  for (let index = 0; index < required.length; index += 1) {
+    const question = required[index];
+    if (!isQuestionApplicable(question.relevance, raw, expressionValues)) continue;
+    applicableCount += 1;
+    if (isQuestionAnswered(question, raw, indexedValues.get(question.code))) answeredCount += 1;
+  }
   return {
-    answeredRequiredQuestions: answered,
-    requiredQuestions: applicable.length,
-    missingRequiredQuestions: applicable.length - answered,
-    requiredCompletionPct: applicable.length ? round2(answered * 100 / applicable.length) : 100,
+    answeredRequiredQuestions: answeredCount,
+    requiredQuestions: applicableCount,
+    missingRequiredQuestions: applicableCount - answeredCount,
+    requiredCompletionPct: applicableCount ? round2(answeredCount * 100 / applicableCount) : 100,
   };
 }
 
 export function isQuestionAnswered(question: SurveyQuestionDefinition, raw: RawResponse, indexed?: unknown[]): boolean {
-  const values = indexed?.length ? indexed : matchingValues(question, raw);
+  const values = indexed ?? matchingValues(question, raw);
   if (!values.length) return false;
   if (MULTIPLE_ANY_TYPES.has(question.type)) return values.some(isSelectedValue);
   if (MULTIPLE_ALL_TYPES.has(question.type)) return values.every(isAnsweredValue);
   return isAnsweredValue(values[0]);
 }
 
-function indexQuestionValues(raw: RawResponse, questions: readonly SurveyQuestionDefinition[]): Map<string, unknown[]> {
+function indexQuestionValues(
+  raw: RawResponse,
+  questions: readonly SurveyQuestionDefinition[],
+): { indexedValues: Map<string, unknown[]>; expressionValues: Map<string, unknown> } {
   let aliases = questionAliasCache.get(questions);
   if (!aliases) {
     aliases = new Map<string, string>();
@@ -52,20 +61,30 @@ function indexQuestionValues(raw: RawResponse, questions: readonly SurveyQuestio
     }
     questionAliasCache.set(questions, aliases);
   }
-  const result = new Map<string, unknown[]>();
-  for (const [key, value] of Object.entries(raw)) {
-    if (SYSTEM_FIELDS.has(key.toLowerCase())) continue;
-    let code = aliases.get(key);
-    if (!code) {
-      const boundary = key.search(/[\s.:[\]#-]/);
-      if (boundary > 0) code = aliases.get(key.slice(0, boundary));
-    }
-    if (!code) continue;
-    const values = result.get(code) ?? [];
-    values.push(value);
-    result.set(code, values);
+  const indexedValues = new Map<string, unknown[]>();
+  const expressionValues = new Map<string, unknown>();
+  for (const question of questions) {
+    indexedValues.set(question.code, []);
   }
-  return result;
+  const keys = Object.keys(raw);
+  for (let index = 0; index < keys.length; index += 1) {
+    const key = keys[index];
+    if (SYSTEM_FIELDS.has(key.toLowerCase())) continue;
+    const value = raw[key];
+    expressionValues.set(key, value);
+    let prefix = "";
+    const boundary = key.search(/[\s.:[\]_#-]/);
+    if (boundary > 0) {
+      prefix = key.slice(0, boundary);
+      if (!expressionValues.has(prefix)) expressionValues.set(prefix, value);
+    }
+    const code = aliases.get(key) ?? (prefix ? aliases.get(prefix) : undefined);
+    if (!code) continue;
+    const values = indexedValues.get(code);
+    if (values) values.push(value);
+    else indexedValues.set(code, [value]);
+  }
+  return { indexedValues, expressionValues };
 }
 
 function matchingValues(question: SurveyQuestionDefinition, raw: RawResponse): unknown[] {
@@ -92,7 +111,11 @@ function isSelectedValue(value: unknown): boolean {
   return !/^(?:N|No|0|false)$/i.test(String(value).trim());
 }
 
-export function isQuestionApplicable(relevance: string, raw: RawResponse): boolean {
+export function isQuestionApplicable(
+  relevance: string,
+  raw: RawResponse,
+  expressionValues?: ReadonlyMap<string, unknown>,
+): boolean {
   const expression = relevance.trim();
   if (!expression || expression === "1") return true;
   if (expression === "0") return false;
@@ -102,7 +125,7 @@ export function isQuestionApplicable(relevance: string, raw: RawResponse): boole
       tokens = tokenize(expression);
       relevanceTokenCache.set(expression, tokens);
     }
-    const parser = new RelevanceParser(tokens, raw);
+    const parser = new RelevanceParser(tokens, raw, expressionValues);
     const result = parser.parse();
     return parser.atEnd() ? truthy(result) : true;
   } catch {
@@ -138,7 +161,11 @@ function tokenize(source: string): Token[] {
 
 class RelevanceParser {
   private position = 0;
-  constructor(private readonly tokens: Token[], private readonly raw: RawResponse) {}
+  constructor(
+    private readonly tokens: Token[],
+    private readonly raw: RawResponse,
+    private readonly expressionValues?: ReadonlyMap<string, unknown>,
+  ) {}
   atEnd(): boolean { return this.position === this.tokens.length; }
   parse(): unknown { return this.parseOr(); }
 
@@ -196,7 +223,7 @@ class RelevanceParser {
       throw new Error(`Función no soportada: ${token.value}`);
     }
     if (/^(?:true|false)$/i.test(token.value)) return token.value.toLowerCase() === "true";
-    return readExpressionValue(this.raw, token.value.replace(/\.NAOK$/i, ""));
+    return readExpressionValue(this.raw, token.value.replace(/\.NAOK$/i, ""), this.expressionValues);
   }
   private peek(): Token | undefined { return this.tokens[this.position]; }
   private match(value: string): boolean {
@@ -213,8 +240,13 @@ class RelevanceParser {
   private expect(value: string): void { if (!this.match(value)) throw new Error(`Se esperaba ${value}`); }
 }
 
-function readExpressionValue(raw: RawResponse, code: string): unknown {
+function readExpressionValue(
+  raw: RawResponse,
+  code: string,
+  expressionValues?: ReadonlyMap<string, unknown>,
+): unknown {
   if (code in raw) return raw[code];
+  if (expressionValues) return expressionValues.get(code) ?? null;
   const match = Object.entries(raw).find(([key]) => keyMatchesPrefix(key, code));
   return match?.[1] ?? null;
 }

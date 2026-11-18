@@ -83,21 +83,22 @@ export default {
       }));
       return;
     }
+    const populations: readonly DashboardPopulation[] = ["students", "teachers", "families"];
+    const minuteIndex = Math.floor(controller.scheduledTime / 60_000);
+    const population = populations[minuteIndex % populations.length];
     const token = await createSessionToken(env);
-    for (const population of ["students", "teachers", "families"] as const) {
-      const url = new URL("/api/dashboard", env.DASHBOARD_SELF_URL);
-      url.searchParams.set("population", population);
-      url.searchParams.set("refresh", "1");
-      const request = new Request(url, { headers: { Authorization: `Bearer ${token}` } });
-      const refreshRequest = env.DASHBOARD_SELF ? env.DASHBOARD_SELF.fetch(request) : fetch(request);
-      ctx.waitUntil(refreshRequest.then(async (response) => {
-        await response.body?.cancel();
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        console.log(JSON.stringify({ message: "dashboard cache refreshed", population }));
-      }).catch((error) => {
-        console.error(JSON.stringify({ message: "dashboard refresh failed", population, error: errorMessage(error) }));
-      }));
-    }
+    const url = new URL("/api/dashboard", env.DASHBOARD_SELF_URL);
+    url.searchParams.set("population", population);
+    url.searchParams.set("refresh", "1");
+    const request = new Request(url, { headers: { Authorization: `Bearer ${token}` } });
+    const refreshRequest = env.DASHBOARD_SELF ? env.DASHBOARD_SELF.fetch(request) : fetch(request);
+    ctx.waitUntil(refreshRequest.then(async (response) => {
+      await response.body?.cancel();
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      console.log(JSON.stringify({ message: "dashboard cache refreshed", population }));
+    }).catch((error) => {
+      console.error(JSON.stringify({ message: "dashboard refresh failed", population, error: errorMessage(error) }));
+    }));
   },
 } satisfies ExportedHandler<Env>;
 

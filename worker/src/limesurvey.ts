@@ -6,6 +6,12 @@ interface RpcEnvelope<T> {
   error?: { code: number; message: string } | null;
 }
 
+interface SurveyQuestionSchema {
+  questions: SurveyQuestionDefinition[];
+  requiredFields: string[];
+}
+const surveySchemaCache = new Map<number, SurveyQuestionSchema>();
+
 export class LimeSurveyClient {
   private requestId = 0;
 
@@ -75,10 +81,16 @@ export class LimeSurveyClient {
         throw new Error(`No se pudo iniciar sesión en LimeSurvey: ${rpcStatus(sessionResult)}`);
       }
       sessionKey = sessionResult;
-      const questionResult = await this.call<unknown>("list_questions", [sessionKey, surveyId, null, null]);
-      const questions = decodeQuestions(questionResult, surveyId);
-      const fieldMapResult = await this.call<unknown>("get_fieldmap", [sessionKey, surveyId, null]);
-      const requiredFields = selectRequiredFields(fieldMapResult, questions);
+      let schema = surveySchemaCache.get(surveyId);
+      if (!schema) {
+        const questionResult = await this.call<unknown>("list_questions", [sessionKey, surveyId, null, null]);
+        const questions = decodeQuestions(questionResult, surveyId);
+        const fieldMapResult = await this.call<unknown>("get_fieldmap", [sessionKey, surveyId, null]);
+        const requiredFields = selectRequiredFields(fieldMapResult, questions);
+        schema = { questions, requiredFields };
+        surveySchemaCache.set(surveyId, schema);
+      }
+      const { questions, requiredFields } = schema;
       const dashboardFields = [...new Set(["id", ...operationalFields])];
       const progressFields = [...new Set(["id", ...requiredFields])];
       const dashboardExport = await this.call<unknown>("export_responses", [
@@ -113,10 +125,10 @@ export function selectRequiredFields(value: unknown, questions: readonly SurveyQ
   const neededQids = new Set(required.map((question) => question.qid));
   const rootByCode = new Map(questions
     .filter((question) => question.parentQid === null)
-    .map((question) => [question.code.toLocaleLowerCase("es-AR"), question.qid]));
+    .map((question) => [question.code.toLowerCase(), question.qid]));
   for (const question of required) {
     for (const token of question.relevance.match(/[\p{L}_][\p{L}\p{N}_]*/gu) ?? []) {
-      const qid = rootByCode.get(token.toLocaleLowerCase("es-AR"));
+      const qid = rootByCode.get(token.toLowerCase());
       if (qid) neededQids.add(qid);
     }
   }
@@ -170,9 +182,15 @@ function rpcStatus(value: unknown): string {
 export function decodeExport(encoded: string): RawResponse[] {
   let text: string;
   try {
-    const binary = atob(encoded);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    const uint8FromBase64 = (Uint8Array as unknown as { fromBase64?: (b64: string) => Uint8Array }).fromBase64;
+    const bytes = uint8FromBase64
+      ? uint8FromBase64(encoded)
+      : (() => {
+          const binary = atob(encoded);
+          const buffer = new Uint8Array(binary.length);
+          for (let index = 0; index < binary.length; index += 1) buffer[index] = binary.charCodeAt(index);
+          return buffer;
+        })();
     text = new TextDecoder().decode(bytes);
   } catch {
     text = encoded;
