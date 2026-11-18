@@ -9,8 +9,16 @@ interface RpcEnvelope<T> {
 interface SurveyQuestionSchema {
   questions: SurveyQuestionDefinition[];
   requiredFields: string[];
+  operationalFieldNames: string[];
+  fieldAliases: Map<string, string>;
 }
 const surveySchemaCache = new Map<number, SurveyQuestionSchema>();
+
+const OPERATIONAL_QUESTION_CODES = new Set([
+  "q996591", "q996592", "q996548", "q449329", "q996545", "q996543", "q993999", "q003",
+  "escuelamayor", "gestion", "tipogestion", "gestionescuela", "gestionmayor", "rol", "rolotro", "edad", "genero",
+  "escuela", "escuelafuera", "anioest", "vinculo", "q284042", "sanmartin",
+]);
 
 export class LimeSurveyClient {
   private requestId = 0;
@@ -87,11 +95,13 @@ export class LimeSurveyClient {
         const questions = decodeQuestions(questionResult, surveyId);
         const fieldMapResult = await this.call<unknown>("get_fieldmap", [sessionKey, surveyId, null]);
         const requiredFields = selectRequiredFields(fieldMapResult, questions);
-        schema = { questions, requiredFields };
+        const operationalFieldNames = selectOperationalFieldNames(fieldMapResult, questions);
+        const fieldAliases = buildFieldAliases(fieldMapResult, questions);
+        schema = { questions, requiredFields, operationalFieldNames, fieldAliases };
         surveySchemaCache.set(surveyId, schema);
       }
-      const { questions, requiredFields } = schema;
-      const dashboardFields = [...new Set(["id", ...operationalFields])];
+      const { questions, requiredFields, operationalFieldNames, fieldAliases } = schema;
+      const dashboardFields = [...new Set(["id", ...operationalFields, ...operationalFieldNames])];
       const progressFields = [...new Set(["id", ...requiredFields])];
       const dashboardExport = await this.call<unknown>("export_responses", [
         sessionKey, surveyId, "json", null, "all", "code", "long", null, null, dashboardFields,
@@ -102,9 +112,14 @@ export class LimeSurveyClient {
       if (typeof dashboardExport !== "string" || typeof progressExport !== "string") {
         throw new Error(`LimeSurvey no pudo exportar respuestas: ${rpcStatus(typeof dashboardExport !== "string" ? dashboardExport : progressExport)}`);
       }
+      const responses = decodeExport(dashboardExport);
+      const progressResponses = decodeExport(progressExport);
+      applyFieldAliases(responses, fieldAliases);
+      applyFieldAliases(progressResponses, fieldAliases);
+      backfillMissingFields(responses, progressResponses);
       return {
-        responses: decodeExport(dashboardExport),
-        progressResponses: decodeExport(progressExport),
+        responses,
+        progressResponses,
         questions,
       };
     } finally {
@@ -138,6 +153,126 @@ export function selectRequiredFields(value: unknown, questions: readonly SurveyQ
     const fieldname = String(rawField.fieldname ?? key).trim();
     return fieldname ? [fieldname] : [];
   });
+}
+
+function selectOperationalFieldNames(value: unknown, questions: readonly SurveyQuestionDefinition[]): string[] {
+  if (!isPlainRecord(value)) return [];
+  const operationalQids = new Set(
+    questions
+      .filter((question) => question.parentQid === null && OPERATIONAL_QUESTION_CODES.has(question.code.toLowerCase()))
+      .map((question) => question.qid),
+  );
+  return Object.entries(value).flatMap(([key, rawField]) => {
+    if (!isPlainRecord(rawField)) return [];
+    const qid = String(rawField.qid ?? "").trim();
+    const title = String(rawField.title ?? "").trim().toLowerCase();
+    if (!operationalQids.has(qid) && !OPERATIONAL_QUESTION_CODES.has(title)) return [];
+    const fieldname = String(rawField.fieldname ?? key).trim();
+    return fieldname ? [fieldname] : [];
+  });
+}
+
+export function buildFieldAliases(value: unknown, questions: readonly SurveyQuestionDefinition[]): Map<string, string> {
+  const aliases = new Map<string, string>();
+  const rootByQid = new Map<string, SurveyQuestionDefinition>();
+  const subByQid = new Map<string, SurveyQuestionDefinition>();
+  for (const question of questions) {
+    if (question.parentQid === null) rootByQid.set(question.qid, question);
+    else subByQid.set(question.qid, question);
+  }
+  for (const question of questions) {
+    if (question.parentQid === null) {
+      if (question.sid && question.gid && question.qid) {
+        aliases.set(`${question.sid}X${question.gid}X${question.qid}`, question.code);
+      }
+    } else {
+      const parent = rootByQid.get(question.parentQid);
+      if (parent && parent.sid && parent.gid && parent.qid) {
+        const sgqaBase = `${parent.sid}X${parent.gid}X${parent.qid}`;
+        const fullCode = `${parent.code}[${question.code}]`;
+        aliases.set(`${sgqaBase}${question.code}`, fullCode);
+        aliases.set(`${sgqaBase}[${question.code}]`, fullCode);
+      }
+    }
+  }
+  if (isPlainRecord(value)) {
+    for (const [key, rawField] of Object.entries(value)) {
+      if (!isPlainRecord(rawField)) continue;
+      const fieldname = String(rawField.fieldname ?? key).trim();
+      const qid = String(rawField.qid ?? "").trim();
+      const sqid = String(rawField.sqid ?? "").trim();
+      const parentCode = String(rawField.title ?? rootByQid.get(qid)?.code ?? "").trim();
+      const aid = String(rawField.aid ?? subByQid.get(sqid)?.code ?? "").trim();
+      if (!fieldname || !parentCode) continue;
+      if (aid && aid !== parentCode) {
+        aliases.set(fieldname, `${parentCode}[${aid}]`);
+      } else {
+        const subMatch = fieldname.match(/^\d+X\d+X(\d+)([A-Za-z0-9_]+)$/);
+        if (subMatch && subMatch[1] === qid && subMatch[2]) {
+          aliases.set(fieldname, `${parentCode}[${subMatch[2]}]`);
+        } else {
+          aliases.set(fieldname, parentCode);
+        }
+      }
+    }
+  }
+  return aliases;
+}
+
+function applyFieldAliases(rows: RawResponse[], aliases: ReadonlyMap<string, string>): void {
+  if (aliases.size === 0) return;
+  for (let i = 0; i < rows.length; i += 1) {
+    const raw = rows[i];
+    const keys = Object.keys(raw);
+    for (let k = 0; k < keys.length; k += 1) {
+      const key = keys[k];
+      const val = raw[key];
+      if (val === null || val === undefined || String(val).trim() === "") continue;
+      const directAlias = aliases.get(key);
+      if (directAlias && (raw[directAlias] === undefined || raw[directAlias] === null || String(raw[directAlias]).trim() === "")) {
+        raw[directAlias] = val;
+        continue;
+      }
+      const boundary = key.search(/[\s.:[\]#-]/);
+      if (boundary > 0) {
+        const prefix = key.slice(0, boundary);
+        const prefixAlias = aliases.get(prefix);
+        if (prefixAlias) {
+          const suffix = key.slice(boundary);
+          const mappedKey = suffix.startsWith("[") ? `${prefixAlias}${suffix}` : prefixAlias;
+          if (raw[mappedKey] === undefined || raw[mappedKey] === null || String(raw[mappedKey]).trim() === "") {
+            raw[mappedKey] = val;
+          }
+        }
+      }
+    }
+  }
+}
+
+function backfillMissingFields(responses: RawResponse[], progressResponses: readonly RawResponse[]): void {
+  if (responses.length === 0 || progressResponses.length === 0) return;
+  const progressById = new Map<string, RawResponse>();
+  for (let i = 0; i < progressResponses.length; i += 1) {
+    const p = progressResponses[i];
+    if (p.id !== null && p.id !== undefined) progressById.set(String(p.id), p);
+  }
+  for (let i = 0; i < responses.length; i += 1) {
+    const row = responses[i];
+    const id = row.id !== null && row.id !== undefined ? String(row.id) : null;
+    const progressRow = (id ? progressById.get(id) : null) ?? progressResponses[i];
+    if (!progressRow) continue;
+    const pKeys = Object.keys(progressRow);
+    for (let k = 0; k < pKeys.length; k += 1) {
+      const key = pKeys[k];
+      const existing = row[key];
+      if (existing === undefined || existing === null || String(existing).trim() === "") {
+        const pVal = progressRow[key];
+        if (pVal !== undefined && pVal !== null && String(pVal).trim() !== "") {
+          row[key] = pVal;
+        }
+      }
+    }
+  }
 }
 
 export function decodeQuestions(value: unknown, surveyId: number): SurveyQuestionDefinition[] {

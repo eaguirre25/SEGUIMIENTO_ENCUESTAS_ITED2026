@@ -238,8 +238,34 @@ function normalizeManagementType(value: unknown): ManagementType {
   return "unknown";
 }
 
+const STATIC_FIELD_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  Q996591: ["977929X336X3233"],
+  Q996592: ["977929X336X3258", "977929X336X3259"],
+  Q996548: ["977929X336X3259", "977929X336X3258"],
+  Q449329: ["977929X336X3191"],
+  Q996545: ["977929X336X3238"],
+  "Q996543[SQ002]": ["977929X337X3250SQ002"],
+  "Q996543[SQ003]": ["977929X337X3250SQ003"],
+  Q993999: ["977929X337X3228"],
+  Q003: ["977929X337X3183"],
+};
+
+function expandFieldAliases(fields: string | readonly string[]): string[] {
+  const base = typeof fields === "string" ? [fields] : fields;
+  const expanded: string[] = [];
+  for (let i = 0; i < base.length; i += 1) {
+    const f = base[i];
+    expanded.push(f);
+    const aliases = STATIC_FIELD_ALIASES[f];
+    if (aliases) {
+      for (let j = 0; j < aliases.length; j += 1) expanded.push(aliases[j]);
+    }
+  }
+  return expanded;
+}
+
 function readMappedValue(raw: RawResponse, fields: string | readonly string[]): unknown {
-  const fieldList = typeof fields === "string" ? [fields] : fields;
+  const fieldList = expandFieldAliases(fields);
   for (let index = 0; index < fieldList.length; index += 1) {
     const exactValue = raw[fieldList[index]];
     if (exactValue !== null && exactValue !== undefined && String(exactValue).trim() !== "") return exactValue;
@@ -609,10 +635,28 @@ function applyTemporalSchoolInference(
     daily.push({ timestamp: anchor.timestamp!, key: schoolIdentityKey(anchor.item!), item: anchor.item! });
     anchorsByDay.set(day, daily);
   }
+  const hasRealAnchorsByDay = new Map<number, boolean>();
+  for (const [day, daily] of anchorsByDay) {
+    const non99 = daily.filter((a) => a.key !== "state:99");
+    if (non99.length >= 2) {
+      hasRealAnchorsByDay.set(day, true);
+      anchorsByDay.set(day, non99);
+    }
+  }
   for (const row of timed) {
-    if (!row.item || row.item.reviewReason !== "insufficient" || row.timestamp === null) continue;
-    const nearby = (anchorsByDay.get(Math.floor(row.timestamp / 86_400_000)) ?? [])
-      .filter(anchor => Math.abs(anchor.timestamp - row.timestamp!) <= 120 * 60_000);
+    if (!row.item || row.timestamp === null) continue;
+    const day = Math.floor(row.timestamp / 86_400_000);
+    const isPlaceholder99 = row.item.schoolNumber === 99
+      && row.item.classificationMethod === "id_only"
+      && hasRealAnchorsByDay.get(day) === true;
+    const isInsufficient = row.item.reviewReason === "insufficient" || isPlaceholder99;
+    const isConflict = row.item.reviewReason === "conflict";
+    if (!isInsufficient && !isConflict) continue;
+    const dayAnchors = anchorsByDay.get(day) ?? [];
+    let nearby = dayAnchors.filter(anchor => Math.abs(anchor.timestamp - row.timestamp!) <= 120 * 60_000);
+    if (nearby.length < 2 && isInsufficient && dayAnchors.length >= 2) {
+      nearby = dayAnchors;
+    }
     if (nearby.length < 2) continue;
     const counts = new Map<string, { item: NormalizedResponse; count: number }>();
     for (const anchor of nearby) {
@@ -624,6 +668,17 @@ function applyTemporalSchoolInference(
     if (counts.has("state:24") && counts.has("state:47")) continue;
     const dominant = [...counts.values()].sort((left, right) => right.count - left.count)[0];
     if (!dominant || dominant.count / nearby.length < 0.8) continue;
+    if (isConflict) {
+      const dominantKey = schoolIdentityKey(dominant.item);
+      const management = normalizeManagementType(readSemanticValue(row.raw, map.MANAGEMENT_TYPE, isManagementAnswer));
+      const nameOnly = resolveStudentSchool(readSchoolBranch(row.raw, map), null, management);
+      const idRaw = map.SCHOOL_IDENTIFIER ? readMappedValue(row.raw, map.SCHOOL_IDENTIFIER) : null;
+      const idOnly = resolveStudentSchool(null, idRaw, management);
+      const matchesDominant = (nameOnly.method !== "requires_review" && schoolIdentityKey(nameOnly.identity) === dominantKey)
+        || (idOnly.method !== "requires_review" && schoolIdentityKey(idOnly.identity) === dominantKey)
+        || String(idRaw ?? "").trim() === "99";
+      if (!matchesDominant) continue;
+    }
     row.item.school = dominant.item.school;
     row.item.schoolKey = dominant.item.schoolKey;
     row.item.schoolNumber = dominant.item.schoolNumber;

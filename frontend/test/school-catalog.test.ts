@@ -29,4 +29,20 @@ describe("catálogo oficial de escuelas", () => {
     expect(officialSchoolName(privateSchool)).toBe("INSTITUTO ALFONSINA STORNI");
     expect(officialSchoolId(privateSchool)).not.toBe("state:6");
   });
+
+  it("ubica en el catálogo las escuelas técnicas ET2, ET3, ET4 y ET5 y variantes privadas", () => {
+    for (const [label, num, code] of [
+      ["ET 2 Alemania", 2, "state:eest-2"],
+      ["ET3", 3, "state:eest-3"],
+      ["ET 4", 4, "state:eest-4"],
+      ["ET5", 5, "state:eest-5"],
+    ] as const) {
+      const tech = { school: label, schoolNumber: num, managementType: "state" as const };
+      expect(officialSchoolId(tech)).toBe(code);
+      expect(schoolLocation(tech)).not.toBeNull();
+    }
+    expect(officialSchoolName({ school: "El Buen Pastor", schoolNumber: null, managementType: "private" })).toBe("INSTITUTO EVANGÉLICO EL BUEN PASTOR");
+    expect(officialSchoolName({ school: "Cristiana FE", schoolNumber: null, managementType: "private" })).toBe("HOGAR ESCUELA CRISTIANA F.E.");
+    expect(officialSchoolName({ school: "La Salle", schoolNumber: null, managementType: "private" })).toBe("INSTITUTO LA SALLE");
+  });
 });

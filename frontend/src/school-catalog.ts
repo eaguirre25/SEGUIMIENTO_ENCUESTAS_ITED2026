@@ -1,6 +1,7 @@
 import stateSchoolsData from "./data/state-schools.json";
 import privateSchoolsData from "./data/private-schools.json";
 import {
+  canonicalPrivateSchoolKey,
   canonicalSchoolIdentity,
   EPS408_NAME,
   REVIEW_REQUIRED_NAME,
@@ -79,6 +80,5 @@ export function officialSchoolId(school: { school: string; schoolNumber: number 
 }
 
 export function privateSchoolKey(value: string): string {
-  const ignored = new Set(["instituto", "colegio", "escuela", "privado", "privada", "secundaria", "educacion", "de", "del", "la", "el"]);
-  return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es-AR").replace(/[^a-z0-9]+/g, " ").trim().split(/\s+/).filter((token) => token && !ignored.has(token)).join(" ");
+  return canonicalPrivateSchoolKey(value);
 }

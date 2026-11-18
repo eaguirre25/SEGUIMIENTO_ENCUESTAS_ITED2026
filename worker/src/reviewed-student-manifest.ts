@@ -1,6 +1,6 @@
 // Closed list approved on 2026-10-27: SHA-256 monitoring fingerprints, not row ordinals.
 // 96 originally requiring review + 5 previously classified as EES99. No medium/open cases.
-export const STUDENT_ASSIGNMENT_AUDIT_REVISION = "2026-10-27-high-101-v1";
+export const STUDENT_ASSIGNMENT_AUDIT_REVISION = "2026-11-18-high-101-v2";
 export const APPROVED_STUDENT_ASSIGNMENTS: ReadonlyMap<string, number> = new Map([
   ["5887aa37ddc2dd5d475465a4cbb76512237a54942434a7fe2f1a28c3536b7b93", 27],
   ["5df57540117a9f28315321a1043e3ecd17d64411f6714302fa5f9cff56924827", 58],

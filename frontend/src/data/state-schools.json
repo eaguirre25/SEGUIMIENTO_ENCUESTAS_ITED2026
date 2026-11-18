@@ -856,6 +856,60 @@
     {
       "type": "Feature",
       "properties": {
+        "schoolNumber": 2,
+        "schoolCode": "eest-2",
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA TÉCNICA Nº2 \"ALEMANIA\"",
+        "cue": "060578900",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "PACÍFICO RODRÍGUEZ 5650"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.55833,
+          -34.54225
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 3,
+        "schoolCode": "eest-3",
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA TÉCNICA Nº3",
+        "cue": "060679400",
+        "locality": "JOSE LEON SUAREZ",
+        "address": "AVDA. 9 DE JULIO 6247"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.57945,
+          -34.54842
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "schoolNumber": 4,
+        "schoolCode": "eest-4",
+        "name": "ESCUELA DE EDUCACIÓN SECUNDARIA TÉCNICA Nº4",
+        "cue": "060860500",
+        "locality": "CIUDAD VILLA BALLESTER",
+        "address": "CHACABUCO 3961"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -58.56782,
+          -34.55584
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
         "schoolNumber": 5,
         "schoolCode": "eest-5",
         "name": "ESCUELA DE EDUCACIÓN SECUNDARIA TÉCNICA Nº5 \"GALILEO GALILEI\"",

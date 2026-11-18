@@ -1,4 +1,4 @@
-import { EEST2_NAME, EEST5_NAME, resolveStudentSchool, EES6_NAME, EES4_NAME, EES47_NAME, EPS408_NAME, REVIEW_REQUIRED_NAME, officialStateSchoolName, schoolIdentityKey } from "../../shared/schools";
+import { EEST2_NAME, EEST3_NAME, EEST4_NAME, EEST5_NAME, resolveStudentSchool, EES6_NAME, EES4_NAME, EES47_NAME, EPS408_NAME, REVIEW_REQUIRED_NAME, officialStateSchoolName, schoolIdentityKey } from "../../shared/schools";
 import { describe, expect, it, vi } from "vitest";
 import { buildDashboard, detectCompletion, firstTeacherSchoolMention, isCoordinateInSanMartin, normalizeGender, normalizeSchool, parseAgeGroup, parseCourseYear, parseSchoolNumber, parseYesNo, splitTimestamp } from "../src/normalize";
 import { decodeExport, LimeSurveyClient } from "../src/limesurvey";
@@ -662,5 +662,74 @@ describe("agregación segura", () => {
       lat: -34.57,
       lon: -58.54,
     }]);
+  });
+
+  it("reconoce ET3, ET4 y ET5 y denominaciones derivadas de escuela secundaria en ID escuela", () => {
+    for (const v3 of ["ET3", "ET 3", "EEST 3", "EET 3", "EST 3", "Tec 3", "Técnica 3", "T3", "Esc. Técnica 3", "Secundaria Técnica 3", "Prefectura Naval"]) {
+      expect(resolveStudentSchool(v3, "EES 3").identity.school).toBe(EEST3_NAME);
+      expect(resolveStudentSchool("Escuela 3", v3).identity.school).toBe(EEST3_NAME);
+    }
+    for (const v4 of ["ET4", "ET 4", "EEST 4", "Tec 4", "T4", "Esc. Técnica 4"]) {
+      expect(resolveStudentSchool(v4, "ES4").identity.school).toBe(EEST4_NAME);
+      expect(resolveStudentSchool("Secundaria 4", v4).identity.school).toBe(EEST4_NAME);
+    }
+    for (const v5 of ["ET5", "ET 5", "EEST 5", "Tec 5", "T5", "Galileo Galilei"]) {
+      expect(resolveStudentSchool(v5, "S5").identity.school).toBe(EEST5_NAME);
+      expect(resolveStudentSchool("Escuela 5", v5).identity.school).toBe(EEST5_NAME);
+    }
+    for (const idVariant of ["Escueal secundaria 13", "Escuela Secundaria Nro 13", "Esc. Secundaria 13", "Sec 13", "Media 13", "EES Nro 13"]) {
+      expect(resolveStudentSchool(null, idVariant).identity.school).toBe(officialStateSchoolName(13));
+    }
+    expect(resolveStudentSchool("Perito Moreno", null).identity.school).toBe(officialStateSchoolName(1));
+    expect(resolveStudentSchool("Armada Argentina", null).identity.school).toBe(officialStateSchoolName(2));
+    expect(resolveStudentSchool("Leopoldo Lugones", null).identity.school).toBe(officialStateSchoolName(3));
+    expect(resolveStudentSchool("Esteban Echeverría", null).identity.school).toBe(officialStateSchoolName(8));
+    expect(resolveStudentSchool("Eduardo Wilde", null).identity.school).toBe(officialStateSchoolName(12));
+    expect(resolveStudentSchool("Tupac Amaru", null).identity.school).toBe(officialStateSchoolName(21));
+    expect(resolveStudentSchool("Rosario Vera Peñaloza", null).identity.school).toBe(officialStateSchoolName(22));
+    expect(resolveStudentSchool("Luis Alberto Spinetta", null).identity.school).toBe(officialStateSchoolName(26));
+    expect(resolveStudentSchool("Victoria Ocampo", null).identity.school).toBe(officialStateSchoolName(48));
+    expect(resolveStudentSchool("René Favaloro", null).identity.school).toBe(officialStateSchoolName(52));
+  });
+
+  it("lee campos SGQA internos en la encuesta de estudiantes y deduce conflictos dentro de una ventana horaria dominante", () => {
+    const result = buildDashboard([
+      {
+        startdate: "2026-09-18 10:00:00",
+        "977929X336X3233": "Estatal",
+        "977929X336X3259": "EES 26",
+        "977929X336X3238": "ES26",
+        "977929X336X3191": "3.º año",
+        "977929X337X3250SQ002": "-34.55",
+        "977929X337X3250SQ003": "-58.58",
+        submitdate: "2026-09-18 10:10:00",
+      },
+      {
+        startdate: "2026-09-18 10:05:00",
+        "977929X336X3233": "Estatal",
+        "977929X336X3259": "Spinetta",
+        "977929X336X3238": "26",
+        "977929X336X3191": "3.º año",
+        submitdate: "2026-09-18 10:15:00",
+      },
+      {
+        startdate: "2026-09-18 10:08:00",
+        "977929X336X3233": "Estatal",
+        "977929X336X3259": "EES 26",
+        "977929X336X3238": "3",
+        "977929X336X3191": "3.º año",
+        submitdate: null,
+      },
+    ], "977929", QUESTION_MAP);
+    expect(result.schools).toHaveLength(1);
+    expect(result.schools[0]).toMatchObject({
+      school: officialStateSchoolName(26),
+      schoolNumber: 26,
+      total: 3,
+      complete: 2,
+      incomplete: 1,
+    });
+    expect(result.mapPoints).toHaveLength(1);
+    expect(result.mapPoints[0]).toMatchObject({ schoolNumber: 26, lat: -34.55, lon: -58.58 });
   });
 });
